@@ -460,7 +460,9 @@ app.get('/api/suppliers', (req, res) => {
     res.json(suppliers);
 });
 
-// 生成PDF订单 - 必须在 /api/order/:id 之前
+// 生成PDF订单 - 使用 pdfkit
+const PDFDocument = require('pdfkit');
+
 app.get('/api/order/:id/pdf', (req, res) => {
     const order = db.prepare(`
         SELECT o.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
@@ -468,43 +470,84 @@ app.get('/api/order/:id/pdf', (req, res) => {
         LEFT JOIN customers c ON o.customer_id = c.id
         WHERE o.id = ?
     `).get(req.params.id);
-    
+
     if (!order) {
         return res.status(404).json({ error: '订单不存在' });
     }
-    
+
     const items = db.prepare(`
         SELECT oi.*, p.name as product_name, p.specs
         FROM order_items oi
         LEFT JOIN products p ON oi.product_id = p.id
         WHERE oi.order_id = ?
     `).all(order.id);
-    
+
     const outstanding = (order.total_amount || 0) - (order.paid_amount || 0);
     const paymentStatusText = {
         'unpaid': '未付款',
         'partial': '部分付款',
-        'paid': '已付清'
+        'paid': '已付清',
+        'pending': '待处理'
     };
-    
-    const html = generateOrderPDF(order, items, outstanding, paymentStatusText);
-    const pdfPath = path.join(__dirname, 'data', 'order_' + order.id + '.pdf');
-    
-    const fs = require('fs');
-    const htmlPath = path.join(__dirname, 'data', 'order_' + order.id + '.html');
-    fs.writeFileSync(htmlPath, html);
-    
-    exec(`wkhtmltopdf "${htmlPath}" "${pdfPath}"`, (error) => {
-        fs.unlinkSync(htmlPath);
-        if (error) {
-            // wkhtmltopdf not available, return HTML for browser view
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.setHeader('Content-Disposition', 'attachment; filename="order_' + order.order_no + '.html"');
-            res.send(html);
-            return;
-        }
-        res.setHeader('Content-Disposition', 'attachment; filename="order_' + order.order_no + '.pdf"'); res.sendFile(pdfPath);
+
+    // 创建 PDF
+    const doc = new PDFDocument({ margin: 50 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="order_${order.order_no}.pdf"`);
+
+    doc.pipe(res);
+
+    // 标题
+    doc.fontSize(20).text('折石咖啡订单', { align: 'center' });
+    doc.moveDown();
+
+    // 订单信息
+    doc.fontSize(12);
+    doc.text(`订单号: ${order.order_no}`);
+    doc.text(`日期: ${order.created_at}`);
+    doc.text(`客户: ${order.customer_name || '-'}`);
+    doc.text(`电话: ${order.customer_phone || '-'}`);
+    doc.text(`地址: ${order.customer_address || '-'}`);
+    doc.moveDown();
+
+    // 表格标题
+    const tableTop = doc.y;
+    doc.fontSize(11).text('产品', 50, tableTop)
+       .text('规格', 180, tableTop)
+       .text('数量', 280, tableTop)
+       .text('单价', 340, tableTop)
+       .text('小计', 430, tableTop, { width: 80, align: 'right' });
+
+    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+    // 表格内容
+    let y = tableTop + 25;
+    items.forEach(item => {
+        doc.text(item.product_name || '-', 50, y)
+           .text(item.specs || '-', 180, y)
+           .text(item.quantity.toString(), 280, y)
+           .text('¥' + item.unit_price, 340, y)
+           .text('¥' + item.subtotal, 430, y, { width: 80, align: 'right' });
+        y += 20;
     });
+
+    // 总计
+    y += 10;
+    doc.moveTo(50, y).lineTo(550, y).stroke();
+    y += 15;
+    doc.fontSize(12).text(`合计: ¥${order.total_amount}`, 300, y, { width: 200, align: 'right' });
+    doc.text(`已付: ¥${order.paid_amount || 0}`, 300, y + 20, { width: 200, align: 'right' });
+    if (outstanding > 0) {
+        doc.fillColor('red').text(`应收: ¥${outstanding}`, 300, y + 40, { width: 200, align: 'right' }).fillColor('black');
+    }
+
+    // 备注
+    if (order.note) {
+        doc.moveDown(3);
+        doc.text(`备注: ${order.note}`);
+    }
+
+    doc.end();
 });
 
 // 获取订单详情
@@ -528,113 +571,6 @@ app.get('/api/order/:id', (req, res) => {
     res.json(order);
 });
 
-function generateOrderPDF(order, items, outstanding, paymentStatusText) {
-    const itemsHTML = items.map(item => `
-        <tr>
-            <td>${item.product_name}</td>
-            <td>${item.specs || '-'}</td>
-            <td>${item.quantity}</td>
-            <td>¥${item.unit_price}</td>
-            <td>¥${item.subtotal}</td>
-        </tr>
-    `).join('');
-    
-    const paymentInfo = order.payment_status ? `
-        <div class="payment-info">
-            <div class="payment-row">
-                <span>订单金额：</span>
-                <strong>¥${order.total_amount}</strong>
-            </div>
-            <div class="payment-row">
-                <span>已付金额：</span>
-                <strong>¥${order.paid_amount || 0}</strong>
-            </div>
-            <div class="payment-row">
-                <span>付款状态：</span>
-                <strong class="${order.payment_status}">${paymentStatusText[order.payment_status] || '未付款'}</strong>
-            </div>
-            <div class="payment-row outstanding">
-                <span>应收金额：</span>
-                <strong>¥${outstanding}</strong>
-            </div>
-        </div>
-    ` : '';
-    
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>订购单 - ${order.order_no}</title>
-    <style>
-        body { font-family: 'Microsoft YaHei', sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; position: relative; }
-        h1 { text-align: center; color: #6b4c35; }
-        .header { display: flex; justify-content: space-between; margin-bottom: 30px; }
-        .info { margin-bottom: 15px; }
-        .info strong { color: #6b4c35; }
-        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background: #f5f5f5; }
-        .total { text-align: right; font-size: 18px; margin-top: 20px; }
-        .total strong { color: #6b4c35; font-size: 24px; }
-        
-        .payment-info { background: #f9f9f9; padding: 20px; border-radius: 8px; margin-top: 20px; }
-        .payment-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ddd; }
-        .payment-row:last-child { border-bottom: none; }
-        .payment-row.outstanding { font-size: 18px; color: #c00; margin-top: 10px; padding-top: 15px; border-top: 2px solid #6b4c35; }
-        .payment-row.outstanding strong { font-size: 22px; }
-        .paid { color: #28a745; }
-        .partial { color: #ffc107; }
-        .unpaid { color: #dc3545; }
-        .footer { margin-top: 40px; text-align: center; color: #999; font-size: 12px; }
-        
-        /* 浮水印 */
-        .watermark {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-30deg);
-            opacity: 0.3;
-            z-index: 1000;
-            pointer-events: none;
-        }
-        .watermark img {
-            width: 300px;
-            height: 300px;
-        }
-    </style>
-</head>
-<body>
-    <div class="watermark">
-        <img src="/stamp.png" />
-    </div>
-    <h1>☕ 订购单</h1>
-    <div class="header">
-        <div class="info"><strong>订单号：</strong>${order.order_no}</div>
-        <div class="info"><strong>日期：</strong>${new Date(order.created_at).toLocaleDateString()}</div>
-    </div>
-    <div class="info"><strong>客户：</strong>${order.shipping_name || order.customer_name || '-'}</div>
-    <div class="info"><strong>电话：</strong>${order.shipping_phone || order.customer_phone || '-'}</div>
-    <div class="info"><strong>地址：</strong>${order.shipping_address || order.customer_address || '-'}</div>
-    
-    <table>
-        <thead>
-            <tr><th>商品名称</th><th>规格</th><th>数量</th><th>单价</th><th>金额</th></tr>
-        </thead>
-        <tbody>${itemsHTML}</tbody>
-    </table>
-    
-    <div class="total"><strong>合计：¥${order.total_amount}</strong></div>
-    ${paymentInfo}
-    ${order.note ? `<div class="info"><strong>备注：</strong>${order.note}</div>` : ''}
-    <div class="footer"><p>上海欧焙客贸易有限公司</p></div>
-</body>
-</html>`;
-}
-
-
-
-// ============ 统计API ============
 
 // 热销产品排行
 app.get('/api/stats/top-products', (req, res) => {
