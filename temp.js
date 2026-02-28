@@ -460,8 +460,8 @@ app.get('/api/suppliers', (req, res) => {
     res.json(suppliers);
 });
 
-// 生成PDF订单 - 使用 pdf-lib
-const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
+// 生成PDF订单 - 使用 pdfkit
+const PDFDocument = require('pdfkit');
 const fs = require('fs');
 
 app.get('/api/order/:id/pdf', async (req, res) => {
@@ -485,98 +485,93 @@ app.get('/api/order/:id/pdf', async (req, res) => {
 
     const outstanding = (order.total_amount || 0) - (order.paid_amount || 0);
 
-    // 创建 PDF
-    const pdfDoc = new PDFDocument({ size: 'A4', margin: 50 });
+    // 创建 PDF 文档
+    const doc = new PDFDocument({ size: 'A4', margin: 50 });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="order_${order.order_no}.pdf"`);
-    pdfDoc.pipe(res);
+    doc.pipe(res);
 
-    // 嵌入中文字体
-    let font = StandardFonts.Helvetica;
-    let fontBold = StandardFonts.HelveticaBold;
+    // 加载中文字体 - 阿里妈妈普惠体
+    let fontName = 'Helvetica';
+    let fontBoldName = 'Helvetica-Bold';
     try {
-        const fontPath = path.join(__dirname, 'public', 'fonts', 'SourceHanSansSC-Regular.otf');
-        const fontBoldPath = path.join(__dirname, 'public', 'fonts', 'SourceHanSansSC-Bold.otf');
+        const fontPath = path.join(__dirname, 'node_modules', '@fontpkg', 'alibaba-puhuiti-2-0', 'AlibabaPuHuiTi-2-55-Regular.ttf');
+        const fontBoldPath = path.join(__dirname, 'node_modules', '@fontpkg', 'alibaba-puhuiti-2-0', 'AlibabaPuHuiTi-2-85-Bold.ttf');
         if (fs.existsSync(fontPath)) {
-            const fontBytes = fs.readFileSync(fontPath);
-            const fontBoldBytes = fs.readFileSync(fontBoldPath);
-            font = await pdfDoc.embedFont(fontBytes);
-            fontBold = await pdfDoc.embedFont(fontBoldBytes);
+            doc.registerFont('Alibaba-Regular', fontPath);
+            doc.registerFont('Alibaba-Bold', fontBoldPath);
+            fontName = 'Alibaba-Regular';
+            fontBoldName = 'Alibaba-Bold';
+            console.log('Alibaba PuHuiTi font loaded successfully');
         }
     } catch (e) {
-        console.error('Font embedding error:', e.message);
-    }
-
-    // 添加公章浮水印
-    let stampImageDoc = null;
-    try {
-        const stampImage = fs.readFileSync(path.join(__dirname, 'public', 'stamp.png'));
-        stampImageDoc = await pdfDoc.embedPng(stampImage);
-    } catch (e) {
-        // 没有公章图片
+        console.error('Font loading error:', e.message);
     }
 
     // 标题
-    pdfDoc.font(fontBold).fontSize(20).text('折石咖啡订单', { align: 'center' });
-    pdfDoc.moveDown();
+    doc.font(fontBoldName).fontSize(20).text('折石咖啡订单', { align: 'center' });
+    doc.moveDown();
 
     // 订单信息
-    pdfDoc.font(font).fontSize(11);
-    pdfDoc.text(`订单号: ${order.order_no}`);
-    pdfDoc.text(`日期: ${order.created_at}`);
-    pdfDoc.text(`客户: ${order.shipping_name || order.customer_name || '-'}`);
-    pdfDoc.text(`电话: ${order.shipping_phone || order.customer_phone || '-'}`);
-    pdfDoc.text(`地址: ${order.shipping_address || order.customer_address || '-'}`);
-    pdfDoc.moveDown();
+    doc.font(fontName).fontSize(11);
+    doc.text(`订单号: ${order.order_no}`);
+    doc.text(`日期: ${order.created_at}`);
+    doc.text(`客户: ${order.shipping_name || order.customer_name || '-'}`);
+    doc.text(`电话: ${order.shipping_phone || order.customer_phone || '-'}`);
+    doc.text(`地址: ${order.shipping_address || order.customer_address || '-'}`);
+    doc.moveDown();
 
     // 表格
-    const tableTop = pdfDoc.y;
-    pdfDoc.fontSize(10);
-    pdfDoc.text('产品', 50, tableTop);
-    pdfDoc.text('规格', 200, tableTop);
-    pdfDoc.text('数量', 320, tableTop);
-    pdfDoc.text('单价', 380, tableTop);
-    pdfDoc.text('小计', 460, tableTop);
+    const tableTop = doc.y;
+    doc.fontSize(10);
+    doc.text('产品', 50, tableTop);
+    doc.text('规格', 200, tableTop);
+    doc.text('数量', 320, tableTop);
+    doc.text('单价', 380, tableTop);
+    doc.text('小计', 460, tableTop);
 
-    pdfDoc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
 
     let y = tableTop + 25;
     items.forEach(item => {
-        pdfDoc.text((item.product_name || '-').substring(0, 20), 50, y);
-        pdfDoc.text((item.specs || '-').substring(0, 15), 200, y);
-        pdfDoc.text(item.quantity.toString(), 320, y);
-        pdfDoc.text('¥' + item.unit_price, 380, y);
-        pdfDoc.text('¥' + item.subtotal, 460, y);
+        doc.text((item.product_name || '-').substring(0, 20), 50, y);
+        doc.text((item.specs || '-').substring(0, 15), 200, y);
+        doc.text(item.quantity.toString(), 320, y);
+        doc.text('¥' + item.unit_price, 380, y);
+        doc.text('¥' + item.subtotal, 460, y);
         y += 18;
     });
 
     // 总计
     y += 10;
-    pdfDoc.moveTo(50, y).lineTo(550, y).stroke();
+    doc.moveTo(50, y).lineTo(550, y).stroke();
     y += 15;
-    pdfDoc.fontSize(12).text(`合计: ¥${order.total_amount}`, 380, y);
-    pdfDoc.text(`已付: ¥${order.paid_amount || 0}`, 380, y + 18);
+    doc.fontSize(12).text(`合计: ¥${order.total_amount}`, 380, y);
+    doc.text(`已付: ¥${order.paid_amount || 0}`, 380, y + 18);
     if (outstanding > 0) {
-        pdfDoc.text(`应收: ¥${outstanding}`, 380, y + 36, { color: rgb(1, 0, 0) });
+        doc.text(`应收: ¥${outstanding}`, 380, y + 36, { color: '#ff0000' });
     }
 
     // 备注
     if (order.note) {
-        pdfDoc.moveDown(3);
-        pdfDoc.text(`备注: ${order.note}`);
+        doc.moveDown(3);
+        doc.text(`备注: ${order.note}`);
     }
 
-    // 添加公章浮水印
-    if (stampImageDoc) {
-        const stampDims = stampImageDoc.scale(0.4);
-        pdfDoc.image(stampImageDoc, 200, 250, {
-            width: stampDims.width,
-            height: stampDims.height,
-            opacity: 0.2
-        });
+    // 添加公章浮水印 - 在 end() 之前
+    try {
+        const stampPath = path.join(__dirname, 'public', 'stamp.png');
+        if (fs.existsSync(stampPath)) {
+            doc.image(stampPath, 200, 250, {
+                fit: [150, 150],
+                opacity: 0.2
+            });
+        }
+    } catch (e) {
+        console.error('Stamp image error:', e.message);
     }
 
-    pdfDoc.end();
+    doc.end();
 });
 
 // 获取订单详情

@@ -370,7 +370,7 @@
                     <button class="btn" onclick="loadOrders()">🔍 筛选</button>
                     <button class="btn" onclick="clearOrderFilters()">清除</button>
                 </div>
-                <table id="orders-table"><thead><tr><th>日期</th><th>客户</th><th>商品明细</th><th>金额</th><th>状态</th><th>付款</th><th>订单号</th><th>操作</th></tr></thead><tbody></tbody></table>
+                <table id="orders-table"><thead><tr><th>日期</th><th>客户</th><th>商品明细</th><th>金额</th><th>状态</th><th>付款</th><th>订单号</th><th>订购单</th></tr></thead><tbody></tbody></table>
             </div>
         </div>
         
@@ -511,7 +511,7 @@
                 html += '<td><span class="status ' + o.status + '">' + o.status + '</span></td>';
                 html += '<td><span class="payment-status ' + (o.payment_status || 'unpaid') + '">' + (paymentText[o.payment_status] || '未付款') + '</span></td>';
                 html += '<td>' + o.order_no + '</td>';
-                html += '<td><button class="btn-sm" onclick="downloadPDF(' + o.id + ')">📄</button></td>';
+                html += '<td><button class="btn-sm" onclick="downloadPDF(' + o.id + ')">PDF</button></td>';
                 html += '</tr>';
             });
             document.querySelector('#orders-table tbody').innerHTML = html;
@@ -563,7 +563,7 @@
                 // 创建销量映射
                 var salesMap = {};
                 topProducts.forEach(function(p) {
-                    salesMap[p.product_name] = { qty: p.qty, total: p.tot };
+                    salesMap[p.product_name] = { qty: p.total_qty, total: p.total };
                 });
                 
                 // 合并产品数据
