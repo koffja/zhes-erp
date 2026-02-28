@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>折石ERP</title>
+    <style>
+        /* ========================================
+           Zhe's Coffee - Morandi Porphyry Color System
+           折石咖啡 - 紫岩霞光 品牌色彩變數庫
+           ======================================== */
+        :root {
+            /* 第一層：基礎色板 (Global Color Palette) */
+            --zhe-dark-porphyry: #3A2E35;    /* 暗斑岩 (神秘、技術權威) */
+            --zhe-ash-rose: #C4B1AE;        /* 灰燼粉 (人文、喚醒的溫度) */
+            --zhe-tuff-white: #EAE5E1;       /* 凝灰白 (空間基底、呼吸感) */
+            --zhe-obsidian-ash: #1A1518;     /* 黑曜灰 (極深紫灰，用於極高對比文本) */
+            --zhe-weathered-gray: #7A7074;    /* 風化岩 (輔助灰，用於次要信息) */
+            --zhe-ash-rose-hover: #D8C9C6;   /* 霞光微亮 (交互懸停) */
+            --zhe-ash-rose-active: #AD9794;  /* 沉岩暗影 (交互按下) */
+            
+            /* 第二層：語義化變數 - 淺色模式 (Light Mode - 默認) */
+            --bg-app: var(--zhe-tuff-white);
+            --bg-card: #FFFFFF;
+            --bg-elevated: var(--zhe-tuff-white);
+            --text-primary: var(--zhe-obsidian-ash);
+            --text-secondary: var(--zhe-dark-porphyry);
+            --text-muted: var(--zhe-weathered-gray);
+            --text-inverse: var(--zhe-tuff-white);
+            --border-subtle: #D1C9C7;
+            --border-strong: var(--zhe-dark-porphyry);
+            --action-primary: var(--zhe-dark-porphyry);
+            --action-primary-hover: var(--zhe-obsidian-ash);
+            --action-accent: var(--zhe-ash-rose);
+            --action-accent-hover: var(--zhe-ash-rose-hover);
+            --action-accent-active: var(--zhe-ash-rose-active);
+        }
+        
+        /* 深色模式反轉邏輯 (Dark Mode) */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-app: var(--zhe-obsidian-ash);
+                --bg-card: var(--zhe-dark-porphyry);
+                --bg-elevated: #281F24;
+                --text-primary: var(--zhe-tuff-white);
+                --text-secondary: var(--zhe-ash-rose);
+                --text-muted: #9A8F93;
+                --text-inverse: var(--zhe-obsidian-ash);
+                --border-subtle: #4A4145;
+                --border-strong: var(--zhe-ash-rose);
+                --action-primary: var(--zhe-ash-rose);
+                --action-primary-hover: var(--zhe-ash-rose-hover);
+                --action-accent: var(--zhe-dark-porphyry);
+                --action-accent-hover: #4A3A40;
+            }
+        }
+        
+        /* 手动切换暗色模式 */
+        html.dark {
+            --bg-app: var(--zhe-obsidian-ash);
+            --bg-card: var(--zhe-dark-porphyry);
+            --bg-elevated: #281F24;
+            --text-primary: var(--zhe-tuff-white);
+            --text-secondary: var(--zhe-ash-rose);
+            --text-muted: #9A8F93;
+            --text-inverse: var(--zhe-obsidian-ash);
+            --border-subtle: #4A4145;
+            --border-strong: var(--zhe-ash-rose);
+            --action-primary: var(--zhe-ash-rose);
+            --action-primary-hover: var(--zhe-ash-rose-hover);
+            --action-accent: var(--zhe-dark-porphyry);
+            --action-accent-hover: #4A3A40;
+        }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+            background-color: var(--bg-app);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        /* 头部 - 暗斑岩 */
+        .header { 
+            background: var(--zhe-dark-porphyry);
+            color: var(--zhe-tuff-white);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { 
+            font-size: 24px;
+            font-weight: 500;
+            letter-spacing: 2px;
+        }
+        
+        /* 主题切换按钮 */
+        .theme-btn {
+            background: var(--zhe-ash-rose);
+            color: var(--zhe-obsidian-ash);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .theme-btn:hover {
+            background: var(--action-accent);
+            color: var(--oatmeal-stone);
+        }
+        
+        /* 导航 */
+        .nav { 
+            background: var(--bg-card);
+            padding: 16px 30px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .nav button[data-section] { 
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .nav button[data-section]:hover {
+            background: var(--action-accent);
+            color: var(--oatmeal-stone);
+        }
+        .nav button[data-section].active { 
+            background: var(--truffle-green);
+            color: var(--oatmeal-stone);
+        }
+        
+        /* 内容区域 - 大留白 */
+        .container { 
+            padding: 30px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .section { display: none; }
+        .section.active { display: block; }
+        
+        /* 卡片 - 浅陶砂 */
+        .card { 
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 28px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 6px rgba(58, 46, 53, 0.08);
+            transition: all 0.3s ease;
+        }
+        
+        /* 时间筛选 */
+        .time-filter { 
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .time-filter button { 
+            padding: 8px 16px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+        .time-filter button:hover {
+            border-color: var(--action-accent);
+        }
+        .time-filter button.active { 
+            background: var(--truffle-green);
+            color: var(--oatmeal-stone);
+            border-color: var(--truffle-green);
+        }
+        .time-filter input { 
+            padding: 8px 12px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+        .time-filter span {
+            color: var(--text-muted);
+        }
+        
+        /* 统计卡片 */
+        .stats { 
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .stat-card { 
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            padding: 24px 20px;
+            border-radius: 8px;
+            text-align: center;
+            transition: transform 0.2s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        .stat-card .value { 
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--action-accent);
+        }
+        .stat-card .label { 
+            color: var(--text-muted);
+            margin-top: 8px;
+            font-size: 14px;
+        }
+        .stat-card.warning .value { color: #dc3545; }
+        
+        /* 表格 */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+        th, td { 
+            padding: 14px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        th { 
+            background: var(--bg-app);
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        html.dark th {
+            background: var(--light-sand);
+        }
+        
+        /* 状态标签 - 暗色友好 */
+        .status { padding: 4px 10px; border-radius: 4px; font-size: 11px; }
+        .status.pending { background: #4A3F00; color: #FFD54F; }
+        .status.confirmed { background: #1B3D1B; color: #81C784; }
+        .status.shipped { background: #1B3D4A; color: #4FC3F7; }
+        .status.completed { background: #1B3D1B; color: #81C784; }
+        
+        .payment-status { padding: 4px 10px; border-radius: 4px; font-size: 11px; }
+        .payment-status.unpaid { background: #4D1B1B; color: #EF9A9A; }
+        .payment-status.partial { background: #4A3F00; color: #FFD54F; }
+        .payment-status.paid { background: #1B3D1B; color: #81C784; }
+        
+        /* 按钮 - 松露深绿 + 余烬金悬停 */
+        .btn { 
+            padding: 8px 16px;
+            background: var(--truffle-green);
+            color: var(--oatmeal-stone);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: var(--action-accent);
+        }
+        
+        .highlight { 
+            color: var(--action-accent); 
+            font-weight: 600; 
+        }
+        html.dark .highlight {
+            color: var(--action-accent);
+        }
+        
+        h3 { 
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            font-size: 16px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        
+        /* 库存输入框 */
+        .stock-input {
+            padding: 8px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            background: var(--bg-app);
+            color: var(--text-primary);
+        }
+        
+        /* 订单号等辅助文字 */
+        .text-muted {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>☕ 折石ERP</h1>
+        <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">🌙 暗色模式</button>
+    </div>
+    <div class="nav">
+        <button class="active" data-section="dashboard">📊 仪表盘</button>
+        <button data-section="orders">📋 订单</button>
+        <button data-section="products">🎁 产品</button>
+        <button data-section="customers">👥 客户</button>
+        <button data-section="stock">📦 库存</button>
+        <button data-section="purchases">🚚 进货</button>
+        <button onclick="toggleTheme()" id="theme-btn" style="margin-left:auto">🌙 暗色模式</button>
+    </div>
+    <div class="container">
+        <div id="dashboard" class="section active">
+            <div class="time-filter">
+                <button onclick="setPeriod('all')" id="btn-all">全部</button>
+                <button onclick="setPeriod('year')" id="btn-year">今年</button>
+                <button onclick="setPeriod('month')" id="btn-month">本月</button>
+                <button onclick="setPeriod('week')" id="btn-week">本周</button>
+                <button onclick="setPeriod('today')" id="btn-today">今日</button>
+                <span style="color:var(--text-secondary)">自定义:</span>
+                <input type="date" id="date-from" onchange="setCustomDate()">
+                <span style="color:var(--text-secondary)">-</span>
+                <input type="date" id="date-to" onchange="setCustomDate()">
+            </div>
+            <div class="stats">
+                <div class="stat-card"><div class="value" id="today-count">0</div><div class="label">今日订单</div></div>
+                <div class="stat-card"><div class="value" id="today-amount">¥0</div><div class="label">今日销售额</div></div>
+                <div class="stat-card"><div class="value" id="total-count">0</div><div class="label">订单数</div></div>
+                <div class="stat-card"><div class="value" id="total-amount">¥0</div><div class="label">销售额</div></div>
+                <div class="stat-card warning"><div class="value" id="outstanding">¥0</div><div class="label">📌 应收款</div></div>
+            </div>
+            <div class="card" style="margin-top:20px">
+                <h3>🏆 热销产品 TOP 10</h3>
+                <table id="top-products-table"><thead><tr><th>排名</th><th>产品</th><th>分类</th><th>总销量</th><th>销售额</th></tr></thead><tbody></tbody></table>
+            </div>
+            <div class="card">
+                <h3>👥 客户消费排行 TOP 10</h3>
+                <table id="top-customers-table"><thead><tr><th>排名</th><th>客户</th><th>订单数</th><th>消费总额</th></tr></thead><tbody></tbody></table>
+            </div>
+        </div>
+        
+        <div id="orders" class="section">
+            <div class="card">
+                <h3>📋 订单列表</h3>
+                <table id="orders-table"><thead><tr><th>日期</th><th>客户</th><th>商品明细</th><th>金额</th><th>状态</th><th>付款</th><th>订单号</th><th>操作</th></tr></thead><tbody></tbody></table>
+            </div>
+        </div>
+        
+        <div id="products" class="section">
+            <div class="card">
+                <h3>🎁 产品销售统计</h3>
+                <table id="products-table"><thead><tr><th>产品</th><th>分类</th><th>规格</th><th>售价</th><th>总销量</th><th>销售额</th></tr></thead><tbody></tbody></table>
+            </div>
+        </div>
+        
+        <div id="customers" class="section">
+            <div class="card">
+                <h3>👥 客户列表（含应收款）</h3>
+                <table id="customers-table"><thead><tr><th>客户</th><th>电话</th><th>订单数</th><th>消费总额</th><th>已收款</th><th>应收款</th></tr></thead><tbody></tbody></table>
+            </div>
+        </div>
+        
+        <div id="stock" class="section">
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+                    <h3>📦 库存盘点</h3>
+                    <button class="btn" onclick="saveStock()">💾 保存库存</button>
+                </div>
+                <table id="stock-table"><thead><tr><th>产品</th><th>分类</th><th>规格</th><th>库存</th><th>价值</th></tr></thead><tbody></tbody></table>
+            </div>
+        </div>
+        
+        <div id="purchases" class="section">
+            <div class="card">
+                <h3>🚚 进货记录</h3>
+                <table id="purchases-table"><thead><tr><th>日期</th><th>商品</th><th>分类</th><th>数量</th><th>单价</th><th>总额</th><th>供应商</th></tr></thead><tbody></tbody></table>
+            </div>
+        </div>
+    </div>
+    <script>
+        var API = '/api';
+        var currentPeriod = 'all';
+        var currentSection = 'dashboard';
+        
+        // 主题切换
+        function toggleTheme() {
+            var root = document.documentElement;
+            var btn = document.getElementById('theme-btn');
+            if (root.classList.contains('dark')) {
+                root.classList.remove('dark');
+                btn.textContent = '🌙 暗色模式';
+                localStorage.setItem('theme', 'light');
+            } else {
+                root.classList.add('dark');
+                btn.textContent = '☀️ 亮色模式';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        
+        // 初始化主题
+        (function() {
+            var saved = localStorage.getItem('theme');
+            if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-btn').textContent = '☀️ 亮色模式';
+            }
+        })();
+        
+        // 初始化
+        document.querySelectorAll('.nav button[data-section]').forEach(function(btn) {
+            btn.onclick = function() {
+                var section = this.getAttribute('data-section');
+                showSection(section, this);
+            };
+        });
+        
+        function showSection(name, btn) {
+            currentSection = name;
+            document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+            document.querySelectorAll('.nav button').forEach(function(b) { b.classList.remove('active'); });
+            document.getElementById(name).classList.add('active');
+            if (btn) btn.classList.add('active');
+            else {
+                var defaultBtn = document.querySelector('.nav button[data-section="' + name + '"]');
+                if (defaultBtn) defaultBtn.classList.add('active');
+            }
+            loadData(name);
+        }
+        
+        function setPeriod(period) {
+            currentPeriod = period;
+            document.querySelectorAll('.time-filter button').forEach(function(b) { b.classList.remove('active'); });
+            var btn = document.getElementById('btn-' + period);
+            if (btn) btn.classList.add('active');
+            loadData('dashboard');
+        }
+        
+        function setCustomDate() {
+            var from = document.getElementById('date-from').value;
+            var to = document.getElementById('date-to').value;
+            if (from && to) {
+                currentPeriod = 'custom';
+                document.querySelectorAll('.time-filter button').forEach(function(b) { b.classList.remove('active'); });
+                loadData('dashboard');
+            }
+        }
+        
+        function getPeriodParams() {
+            var params = '?period=' + currentPeriod;
+            if (currentPeriod === 'custom') {
+                var from = document.getElementById('date-from').value;
+                var to = document.getElementById('date-to').value;
+                if (from && to) params = '?period=custom&from=' + from + '&to=' + to;
+            }
+            return params;
+        }
+        
+        async function loadData(section) {
+            if (section === 'dashboard') {
+                var stats = await fetch(API + '/stats' + getPeriodParams()).then(function(r) { return r.json(); });
+                document.getElementById('today-count').textContent = stats.today.count;
+                document.getElementById('today-amount').textContent = '¥' + stats.today.total;
+                document.getElementById('total-count').textContent = stats.total.count;
+                document.getElementById('total-amount').textContent = '¥' + stats.total.total;
+                document.getElementById('outstanding').textContent = '¥' + (stats.receivable ? stats.receivable.outstanding : 0);
+                
+                var topProducts = await fetch(API + '/stats/top-products' + getPeriodParams()).then(function(r) { return r.json(); });
+                var html = '';
+                topProducts.forEach(function(p, i) {
+                    html += '<tr><td>' + (i+1) + '</td><td>' + p.product_name + '</td><td>' + (p.category || '-') + '</td><td>' + p.total_qty + '</td><td class="highlight">¥' + p.total + '</td></tr>';
+                });
+                document.querySelector('#top-products-table tbody').innerHTML = html;
+                
+                var topCustomers = await fetch(API + '/stats/top-customers' + getPeriodParams()).then(function(r) { return r.json(); });
+                html = '';
+                topCustomers.forEach(function(c, i) {
+                    html += '<tr><td>' + (i+1) + '</td><td>' + c.name + '</td><td>' + c.order_count + '</td><td class="highlight">¥' + c.total + '</td></tr>';
+                });
+                document.querySelector('#top-customers-table tbody').innerHTML = html;
+            }
+            
+            if (section === 'orders') {
+                var orders = await fetch(API + '/orders').then(function(r) { return r.json(); });
+                var paymentText = {unpaid: '未付款', partial: '部分付款', paid: '已付清'};
+                var html = '';
+                orders.forEach(function(o) {
+                    var items = o.items.map(function(i) { return i.product_name + '×' + i.quantity; }).join(', ');
+                    html += '<tr>';
+                    html += '<td>' + new Date(o.created_at).toLocaleDateString() + '</td>';
+                    html += '<td>' + (o.shipping_name || '-') + '</td>';
+                    html += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + items + '</td>';
+                    html += '<td class="highlight">¥' + o.total_amount + '</td>';
+                    html += '<td><span class="status ' + o.status + '">' + o.status + '</span></td>';
+                    html += '<td><span class="payment-status ' + (o.payment_status || 'unpaid') + '">' + (paymentText[o.payment_status] || '未付款') + '</span></td>';
+                    html += '<td class="text-muted">' + o.order_no + '</td>';
+                    html += '<td><button class="btn" onclick="downloadPDF(' + o.id + ')">PDF</button></td>';
+                    html += '</tr>';
+                });
+                document.querySelector('#orders-table tbody').innerHTML = html;
+            }
+            
+            if (section === 'products') {
+                // 从库存数据中获取产品信息，包含销量的产品用topProducts补充
+                var stats = await fetch(API + '/stats').then(function(r) { return r.json(); });
+                var topProducts = await fetch(API + '/stats/top-products').then(function(r) { return r.json(); });
+                
+                // 创建销量映射
+                var salesMap = {};
+                topProducts.forEach(function(p) {
+                    salesMap[p.product_name] = { qty: p.qty, total: p.tot };
+                });
+                
+                // 合并产品数据
+                var products = stats.stock.map(function(p) {
+                    var sale = salesMap[p.name] || { qty: 0, total: 0 };
+                    return {
+                        name: p.name,
+                        category: p.category,
+                        specs: p.specs,
+                        price: p.price,
+                        total_qty: sale.qty,
+                        total: sale.total
+                    };
+                });
+                
+                var html = '';
+                products.forEach(function(p) {
+                    if (p.total_qty > 0 || p.price > 0) {
+                        html += '<tr><td>' + p.name + '</td><td>' + (p.category || '-') + '</td><td>' + (p.specs || '-') + '</td><td>¥' + p.price + '</td><td>' + p.total_qty + '</td><td class="highlight">¥' + p.total + '</td></tr>';
+                    }
+                });
+                document.querySelector('#products-table tbody').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">暂无销售数据</td></tr>';
+            }
+            
+            if (section === 'customers') {
+                var customers = await fetch(API + '/customers').then(function(r) { return r.json(); });
+                var html = '';
+                customers.forEach(function(c) {
+                    var outstanding = (c.tr || 0) - (c.tp || 0);
+                    html += '<tr>';
+                    html += '<td>' + c.name + '</td>';
+                    html += '<td>' + (c.phone || '-') + '</td>';
+                    html += '<td>' + (c.oc || 0) + '</td>';
+                    html += '<td class="highlight">¥' + (c.tr || 0) + '</td>';
+                    html += '<td>¥' + (c.tp || 0) + '</td>';
+                    html += '<td style="color:' + (outstanding > 0 ? '#dc3545' : '#28a745') + '">¥' + outstanding + '</td>';
+                    html += '</tr>';
+                });
+                document.querySelector('#customers-table tbody').innerHTML = html;
+            }
+            
+            if (section === 'stock') {
+                var stats = await fetch(API + '/stats').then(function(r) { return r.json(); });
+                var html = '';
+                stats.stock.forEach(function(p) {
+                    html += '<tr>';
+                    html += '<td>' + p.name + '</td>';
+                    html += '<td>' + (p.category || '-') + '</td>';
+                    html += '<td>' + (p.specs || '-') + '</td>';
+                    html += '<td><input type="number" class="stock-input" data-id="' + p.id + '" value="' + (p.stock || 0) + '"></td>';
+                    html += '<td>¥' + ((p.stock || 0) * p.price) + '</td>';
+                    html += '</tr>';
+                });
+                document.querySelector('#stock-table tbody').innerHTML = html;
+            }
+            
+            if (section === 'purchases') {
+                var purchases = await fetch(API + '/purchases').then(function(r) { return r.json(); });
+                var html = '';
+                purchases.forEach(function(p) {
+                    html += '<tr>';
+                    html += '<td>' + p.purchase_date + '</td>';
+                    html += '<td>' + p.product_name + '</td>';
+                    html += '<td>' + (p.category || '-') + '</td>';
+                    html += '<td>' + p.quantity + '</td>';
+                    html += '<td>¥' + p.unit_price + '</td>';
+                    html += '<td class="highlight">¥' + p.total_amount + '</td>';
+                    html += '<td>' + (p.supplier_name || '-') + '</td>';
+                    html += '</tr>';
+                });
+                document.querySelector('#purchases-table tbody').innerHTML = html;
+            }
+        }
+        
+        function downloadPDF(orderId) {
+            window.open(API + '/order/' + orderId + '/pdf', '_blank');
+        }
+        
+        async function saveStock() {
+            var inputs = document.querySelectorAll('.stock-input');
+            var stocks = [];
+            inputs.forEach(function(input) {
+                stocks.push({ product_id: parseInt(input.dataset.id), stock: parseInt(input.value) || 0 });
+            });
+            await fetch(API + '/stock/batch', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({stocks: stocks}) });
+            alert('库存已保存！');
+            loadData('stock');
+        }
+        
+        // 初始加载
+        setPeriod('all');
+    </script>
+</body>
+</html>

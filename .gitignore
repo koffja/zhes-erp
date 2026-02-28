@@ -1,0 +1,6 @@
+node_modules/
+data/*.db
+data/*.pdf
+data/*.html
+.DS_Store
+*.log
