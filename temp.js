@@ -195,16 +195,32 @@ app.get('/api/customer/:id/orders', (req, res) => {
 
 // 获取客户列表（带应收款）
 app.get('/api/customers', (req, res) => {
-    const customers = db.prepare(`
-        SELECT c.*,
-            COUNT(o.id) as order_count,
-            COALESCE(SUM(o.total_amount), 0) as total_receivable,
-            COALESCE(SUM(o.paid_amount), 0) as total_paid
-        FROM customers c
-        LEFT JOIN orders o ON c.id = o.customer_id
-        GROUP BY c.id
-        ORDER BY c.name
-    `).all();
+    const { all } = req.query;
+    let sql;
+    if (all) {
+        sql = `
+            SELECT c.*,
+                COUNT(o.id) as order_count,
+                COALESCE(SUM(o.total_amount), 0) as total_receivable,
+                COALESCE(SUM(o.paid_amount), 0) as total_paid
+            FROM customers c
+            LEFT JOIN orders o ON c.id = o.customer_id
+            GROUP BY c.id
+            ORDER BY total_receivable DESC, c.name
+        `;
+    } else {
+        sql = `
+            SELECT c.*,
+                COUNT(o.id) as order_count,
+                COALESCE(SUM(o.total_amount), 0) as total_receivable,
+                COALESCE(SUM(o.paid_amount), 0) as total_paid
+            FROM customers c
+            INNER JOIN orders o ON c.id = o.customer_id
+            GROUP BY c.id
+            ORDER BY total_receivable DESC, c.name
+        `;
+    }
+    const customers = db.prepare(sql).all();
     res.json(customers);
 });
 
@@ -267,43 +283,96 @@ app.post('/api/products/:id/aliases', (req, res) => {
 
 // 统计报表
 app.get('/api/stats', (req, res) => {
+    const { period, from, to } = req.query;
+
+    let dateFilter = '';
+    let todayFilter = "date(created_at) = date('now')";
+    let periodSql = '';
+    let periodParams = [];
+
+    if (period === 'today') {
+        dateFilter = "date(created_at) = date('now')";
+    } else if (period === 'week') {
+        dateFilter = "date(created_at) >= date('now', '-7 days')";
+    } else if (period === 'month') {
+        dateFilter = "date(created_at) >= date('now', '-30 days')";
+    } else if (period === 'year') {
+        dateFilter = "date(created_at) >= date('now', '-365 days')";
+    } else if (period === 'custom' && from && to) {
+        dateFilter = "date(created_at) >= ? AND date(created_at) <= ?";
+        periodParams = [from, to];
+    }
+
+    // 构建筛选期间的SQL
+    if (dateFilter) {
+        if (period === 'custom' && from && to) {
+            periodSql = `WHERE ${dateFilter}`;
+        } else {
+            periodSql = `WHERE ${dateFilter}`;
+        }
+    }
+
+    // 筛选期间的订单统计
+    const periodOrders = db.prepare(`
+        SELECT COUNT(*) as cnt, COALESCE(SUM(total_amount), 0) as tot
+        FROM orders
+        ${periodSql}
+    `).get(...periodParams);
+
+    // 今日订单（始终显示）
     const todayOrders = db.prepare(`
         SELECT COUNT(*) as cnt, COALESCE(SUM(total_amount), 0) as tot
         FROM orders
-        WHERE date(created_at) = date('now')
+        WHERE ${todayFilter}
     `).get();
 
+    // 全部订单
     const totalOrders = db.prepare(`
         SELECT COUNT(*) as cnt, COALESCE(SUM(total_amount), 0) as tot
         FROM orders
     `).get();
 
+    // 热销产品（根据筛选）
+    let productFilter = '';
+    let productParams = [];
+    if (dateFilter) {
+        if (period === 'custom' && from && to) {
+            productFilter = `AND ${dateFilter}`;
+            productParams = [from + ' 00:00:00', to + ' 23:59:59'];
+        } else {
+            productFilter = `AND ${dateFilter}`;
+        }
+    }
+
     const topProducts = db.prepare(`
-        SELECT product_name, category, SUM(quantity) as total_qty, SUM(subtotal) as total
-        FROM order_items
-        LEFT JOIN products ON order_items.product_id = products.id
-        GROUP BY product_name
+        SELECT oi.product_name, p.category, SUM(oi.quantity) as total_qty, SUM(oi.subtotal) as total
+        FROM order_items oi
+        LEFT JOIN products p ON oi.product_id = p.id
+        LEFT JOIN orders o ON oi.order_id = o.id
+        ${dateFilter ? 'WHERE ' + dateFilter.replace(/created_at/g, 'o.created_at') : ''}
+        GROUP BY oi.product_name
         ORDER BY total_qty DESC
-        LIMIT 5
-    `).all();
-    
+        LIMIT 10
+    `).all(...(period === 'custom' && from && to ? [from + ' 00:00:00', to + ' 23:59:59'] : []));
+
     const stockList = db.prepare(`
         SELECT id, name, category, specs, stock, price
         FROM products
         ORDER BY category, name
     `).all();
-    
-    // 应收款统计
+
+    // 应收款统计（根据筛选）
     const receivable = db.prepare(`
-        SELECT 
+        SELECT
             COALESCE(SUM(total_amount), 0) as total,
             COALESCE(SUM(paid_amount), 0) as paid
         FROM orders
-    `).get();
-    
+        ${periodSql}
+    `).get(...periodParams);
+
     res.json({
         today: { count: todayOrders.cnt, total: todayOrders.tot },
-        total: { count: totalOrders.cnt, total: totalOrders.tot },
+        total: { count: periodOrders.cnt, total: periodOrders.tot },
         topProducts,
         stock: stockList,
         receivable: {
@@ -316,15 +385,58 @@ app.get('/api/stats', (req, res) => {
 
 // 客户消费排行
 app.get('/api/stats/top-customers', (req, res) => {
-    const topCustomers = db.prepare(`
-        SELECT c.name, COUNT(o.id) as order_count, COALESCE(SUM(o.total_amount), 0) as total
-        FROM customers c
-        LEFT JOIN orders o ON c.id = o.customer_id
-        GROUP BY c.id
-        HAVING order_count > 0
-        ORDER BY total DESC
-        LIMIT 10
-    `).all();
+    const { period, from, to } = req.query;
+
+    let dateFilter = '';
+    if (period === 'today') {
+        dateFilter = "date(o.created_at) = date('now')";
+    } else if (period === 'week') {
+        dateFilter = "date(o.created_at) >= date('now', '-7 days')";
+    } else if (period === 'month') {
+        dateFilter = "date(o.created_at) >= date('now', '-30 days')";
+    } else if (period === 'year') {
+        dateFilter = "date(o.created_at) >= date('now', '-365 days')";
+    } else if (period === 'custom' && from && to) {
+        dateFilter = "date(o.created_at) >= date(?) AND date(o.created_at) <= date(?)";
+    }
+
+    let sql, params = [];
+    if (dateFilter) {
+        if (period === 'custom' && from && to) {
+            sql = `
+                SELECT c.name, COUNT(o.id) as order_count, COALESCE(SUM(o.total_amount), 0) as total
+                FROM customers c
+                INNER JOIN orders o ON c.id = o.customer_id AND ${dateFilter}
+                GROUP BY c.id
+                HAVING order_count > 0
+                ORDER BY total DESC
+                LIMIT 10
+            `;
+            params = [from, to];
+        } else {
+            sql = `
+                SELECT c.name, COUNT(o.id) as order_count, COALESCE(SUM(o.total_amount), 0) as total
+                FROM customers c
+                INNER JOIN orders o ON c.id = o.customer_id AND ${dateFilter}
+                GROUP BY c.id
+                HAVING order_count > 0
+                ORDER BY total DESC
+                LIMIT 10
+            `;
+        }
+    } else {
+        sql = `
+            SELECT c.name, COUNT(o.id) as order_count, COALESCE(SUM(o.total_amount), 0) as total
+            FROM customers c
+            LEFT JOIN orders o ON c.id = o.customer_id
+            GROUP BY c.id
+            HAVING order_count > 0
+            ORDER BY total DESC
+            LIMIT 10
+        `;
+    }
+
+    const topCustomers = db.prepare(sql).all(...params);
     res.json(topCustomers);
 });
 
@@ -526,14 +638,57 @@ function generateOrderPDF(order, items, outstanding, paymentStatusText) {
 
 // 热销产品排行
 app.get('/api/stats/top-products', (req, res) => {
-    const products = db.prepare(`
-        SELECT oi.product_name, p.category, SUM(oi.quantity) as total_qty, SUM(oi.subtotal) as total
-        FROM order_items oi
-        LEFT JOIN products p ON oi.product_id = p.id
-        GROUP BY oi.product_name
-        ORDER BY total_qty DESC
-        LIMIT 10
-    `).all();
+    const { period, from, to } = req.query;
+
+    let dateFilter = '';
+    if (period === 'today') {
+        dateFilter = "date(o.created_at) = date('now')";
+    } else if (period === 'week') {
+        dateFilter = "date(o.created_at) >= date('now', '-7 days')";
+    } else if (period === 'month') {
+        dateFilter = "date(o.created_at) >= date('now', '-30 days')";
+    } else if (period === 'year') {
+        dateFilter = "date(o.created_at) >= date('now', '-365 days')";
+    } else if (period === 'custom' && from && to) {
+        dateFilter = "date(o.created_at) >= date(?) AND date(o.created_at) <= date(?)";
+    }
+
+    let sql, params = [];
+    if (dateFilter) {
+        if (period === 'custom' && from && to) {
+            sql = `
+                SELECT oi.product_name, p.category, SUM(oi.quantity) as total_qty, SUM(oi.subtotal) as total
+                FROM order_items oi
+                LEFT JOIN products p ON oi.product_id = p.id
+                INNER JOIN orders o ON oi.order_id = o.id AND ${dateFilter}
+                GROUP BY oi.product_name
+                ORDER BY total_qty DESC
+                LIMIT 10
+            `;
+            params = [from, to];
+        } else {
+            sql = `
+                SELECT oi.product_name, p.category, SUM(oi.quantity) as total_qty, SUM(oi.subtotal) as total
+                FROM order_items oi
+                LEFT JOIN products p ON oi.product_id = p.id
+                INNER JOIN orders o ON oi.order_id = o.id AND ${dateFilter}
+                GROUP BY oi.product_name
+                ORDER BY total_qty DESC
+                LIMIT 10
+            `;
+        }
+    } else {
+        sql = `
+            SELECT oi.product_name, p.category, SUM(oi.quantity) as total_qty, SUM(oi.subtotal) as total
+            FROM order_items oi
+            LEFT JOIN products p ON oi.product_id = p.id
+            GROUP BY oi.product_name
+            ORDER BY total_qty DESC
+            LIMIT 10
+        `;
+    }
+
+    const products = db.prepare(sql).all(...params);
     res.json(products);
 });
 

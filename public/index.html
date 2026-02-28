@@ -14,62 +14,65 @@
             --zhe-dark-porphyry: #3A2E35;    /* 暗斑岩 (神秘、技術權威) */
             --zhe-ash-rose: #C4B1AE;        /* 灰燼粉 (人文、喚醒的溫度) */
             --zhe-tuff-white: #EAE5E1;       /* 凝灰白 (空間基底、呼吸感) */
+            --zhe-oatmeal-stone: #F5F0EB;    /* 燕麥白 (更亮的基底) */
             --zhe-obsidian-ash: #1A1518;     /* 黑曜灰 (極深紫灰，用於極高對比文本) */
             --zhe-weathered-gray: #7A7074;    /* 風化岩 (輔助灰，用於次要信息) */
             --zhe-ash-rose-hover: #D8C9C6;   /* 霞光微亮 (交互懸停) */
             --zhe-ash-rose-active: #AD9794;  /* 沉岩暗影 (交互按下) */
-            
+
             /* 第二層：語義化變數 - 淺色模式 (Light Mode - 默認) */
-            --bg-app: var(--zhe-tuff-white);
-            --bg-card: #FFFFFF;
-            --bg-elevated: var(--zhe-tuff-white);
-            --text-primary: var(--zhe-obsidian-ash);
-            --text-secondary: var(--zhe-dark-porphyry);
-            --text-muted: var(--zhe-weathered-gray);
+            --bg-app: var(--zhe-oatmeal-stone);  /* 燕麥白 - 主背景 */
+            --bg-card: #FFFFFF;                  /* 純白卡片 */
+            --bg-elevated: var(--zhe-tuff-white); /* 凝灰白 - 浮起元素 */
+            --text-primary: var(--zhe-dark-porphyry);  /* 暗斑岩 - 主文字 */
+            --text-secondary: #5A5155;           /* 淺暗斑岩 - 次要文字 */
+            --text-muted: var(--zhe-weathered-gray);  /* 風化岩 */
             --text-inverse: var(--zhe-tuff-white);
-            --border-subtle: #D1C9C7;
+            --border-subtle: #E8E3DF;            /* 更淡的邊框 */
             --border-strong: var(--zhe-dark-porphyry);
             --action-primary: var(--zhe-dark-porphyry);
             --action-primary-hover: var(--zhe-obsidian-ash);
-            --action-accent: var(--zhe-ash-rose);
+            --action-accent: var(--zhe-ash-rose);      /* 灰燼粉 - 點睛按鈕 */
             --action-accent-hover: var(--zhe-ash-rose-hover);
             --action-accent-active: var(--zhe-ash-rose-active);
         }
         
-        /* 深色模式反轉邏輯 (Dark Mode) */
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-app: var(--zhe-obsidian-ash);
-                --bg-card: var(--zhe-dark-porphyry);
-                --bg-elevated: #281F24;
-                --text-primary: var(--zhe-tuff-white);
-                --text-secondary: var(--zhe-ash-rose);
-                --text-muted: #9A8F93;
-                --text-inverse: var(--zhe-obsidian-ash);
-                --border-subtle: #4A4145;
-                --border-strong: var(--zhe-ash-rose);
-                --action-primary: var(--zhe-ash-rose);
-                --action-primary-hover: var(--zhe-ash-rose-hover);
-                --action-accent: var(--zhe-dark-porphyry);
-                --action-accent-hover: #4A3A40;
-            }
-        }
+        /* 深色模式 - 仅通过 html.dark 类切换，不再自动检测系统 */
+        /* @media (prefers-color-scheme: dark) { } */
         
-        /* 手动切换暗色模式 */
+        /* 手动切换暗色模式 - 紫岩霞光暗色版 */
         html.dark {
-            --bg-app: var(--zhe-obsidian-ash);
-            --bg-card: var(--zhe-dark-porphyry);
-            --bg-elevated: #281F24;
-            --text-primary: var(--zhe-tuff-white);
-            --text-secondary: var(--zhe-ash-rose);
-            --text-muted: #9A8F93;
-            --text-inverse: var(--zhe-obsidian-ash);
-            --border-subtle: #4A4145;
-            --border-strong: var(--zhe-ash-rose);
-            --action-primary: var(--zhe-ash-rose);
-            --action-primary-hover: var(--zhe-ash-rose-hover);
-            --action-accent: var(--zhe-dark-porphyry);
-            --action-accent-hover: #4A3A40;
+            --bg-app: #1A1518;           /* 黑曜灰 - 主背景 */
+            --bg-card: #3A2E35;          /* 暗斑岩 - 卡片 */
+            --bg-elevated: #4A4145;      /* 提亮的暗斑岩 */
+            --text-primary: #EAE5E1;     /* 凝灰白 - 主文字 */
+            --text-secondary: #C4B1AE;   /* 灰烬粉 - 次要文字 */
+            --text-muted: #7A7074;       /* 风化岩 - 弱化文字 */
+            --text-inverse: #1A1518;      /* 黑曜灰 - 反色文字 */
+            --border-subtle: #5A5155;     /* 暗斑岩边框 */
+            --border-strong: #C4B1AE;    /* 灰烬粉 - 强调边框 */
+            --action-primary: #C4B1AE;   /* 灰烬粉 - 主要按钮 */
+            --action-primary-hover: #D8C9C6;
+            --action-accent: #5A5155;    /* 暗斑岩 - 辅助按钮 */
+            --action-accent-hover: #6A6165;
+            --zhe-dark-porphyry: #2D2528;
+            --zhe-ash-rose: #C4B1AE;
+            --zhe-tuff-white: #EAE5E1;
+            --zhe-obsidian-ash: #0D0B0D;
+        }
+
+        /* 暗色模式下的导航按钮 */
+        html.dark .nav button[data-section]:hover {
+            background: var(--action-accent);
+            color: var(--zhe-tuff-white);
+        }
+        html.dark .nav button[data-section].active {
+            background: var(--zhe-dark-porphyry);
+            color: var(--zhe-ash-rose);
+        }
+        html.dark .theme-btn:hover {
+            background: var(--action-accent-hover);
+            color: var(--zhe-tuff-white);
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -83,9 +86,9 @@
         }
         
         /* 头部 - 暗斑岩 */
-        .header { 
+        .header {
             background: var(--zhe-dark-porphyry);
-            color: var(--zhe-tuff-white);
+            color: var(--zhe-ash-rose);  /* 灰烬粉文字 */
             padding: 20px 30px;
             display: flex;
             justify-content: space-between;
@@ -109,8 +112,8 @@
             transition: all 0.3s ease;
         }
         .theme-btn:hover {
-            background: var(--action-accent);
-            color: var(--oatmeal-stone);
+            background: var(--action-accent-hover);
+            color: var(--zhe-obsidian-ash);
         }
         
         /* 导航 */
@@ -135,11 +138,11 @@
         }
         .nav button[data-section]:hover {
             background: var(--action-accent);
-            color: var(--oatmeal-stone);
+            color: var(--zhe-obsidian-ash);
         }
-        .nav button[data-section].active { 
-            background: var(--truffle-green);
-            color: var(--oatmeal-stone);
+        .nav button[data-section].active {
+            background: var(--zhe-ash-rose);
+            color: var(--zhe-obsidian-ash);
         }
         
         /* 内容区域 - 大留白 */
@@ -315,7 +318,6 @@
 <body>
     <div class="header">
         <h1>☕ 折石ERP</h1>
-        <button class="theme-btn" onclick="toggleTheme()" id="theme-btn">🌙 暗色模式</button>
     </div>
     <div class="nav">
         <button class="active" data-section="dashboard">📊 仪表盘</button>
@@ -324,7 +326,7 @@
         <button data-section="customers">👥 客户</button>
         <button data-section="stock">📦 库存</button>
         <button data-section="purchases">🚚 进货</button>
-        <button onclick="toggleTheme()" style="margin-left:auto">🌙 暗色模式</button>
+        <button class="theme-btn" onclick="toggleTheme()" id="theme-btn" style="margin-left:auto">🌙 暗色模式</button>
     </div>
     <div class="container">
         <div id="dashboard" class="section active">
@@ -382,6 +384,9 @@
         <div id="customers" class="section">
             <div class="card">
                 <h3>👥 客户列表（含应收款）</h3>
+                <label style="margin-bottom:12px;display:inline-block">
+                    <input type="checkbox" id="show-all-customers" onchange="loadCustomers()"> 显示全部客户（含无订单）
+                </label>
                 <table id="customers-table"><thead><tr><th>客户</th><th>电话</th><th>订单数</th><th>消费总额</th><th>已收款</th><th>应收款</th></tr></thead><tbody></tbody></table>
             </div>
         </div>
@@ -423,10 +428,10 @@
             }
         }
         
-        // 初始化主题
+        // 初始化主题 - 默认亮色模式
         (function() {
             var saved = localStorage.getItem('theme');
-            if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            if (saved === 'dark') {
                 document.documentElement.classList.add('dark');
                 document.getElementById('theme-btn').textContent = '☀️ 亮色模式';
             }
@@ -584,7 +589,14 @@
             }
             
             if (section === 'customers') {
-                var customers = await fetch(API + '/customers').then(function(r) { return r.json(); });
+                loadCustomers();
+            }
+
+            async function loadCustomers() {
+                var showAll = document.getElementById('show-all-customers').checked;
+                var url = API + '/customers';
+                if (showAll) url += '?all=1';
+                var customers = await fetch(url).then(function(r) { return r.json(); });
                 var html = '';
                 customers.forEach(function(c) {
                     var outstanding = (c.total_receivable || 0) - (c.total_paid || 0);
