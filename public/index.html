@@ -324,7 +324,7 @@
         <button data-section="customers">👥 客户</button>
         <button data-section="stock">📦 库存</button>
         <button data-section="purchases">🚚 进货</button>
-        <button onclick="toggleTheme()" id="theme-btn" style="margin-left:auto">🌙 暗色模式</button>
+        <button onclick="toggleTheme()" style="margin-left:auto">🌙 暗色模式</button>
     </div>
     <div class="container">
         <div id="dashboard" class="section active">
@@ -359,6 +359,15 @@
         <div id="orders" class="section">
             <div class="card">
                 <h3>📋 订单列表</h3>
+                <div class="filter-bar">
+                    <input type="date" id="order-date-from" placeholder="开始日期">
+                    <span>至</span>
+                    <input type="date" id="order-date-to" placeholder="结束日期">
+                    <input type="text" id="order-product-search" placeholder="品名搜索" style="width:120px">
+                    <input type="text" id="order-customer-search" placeholder="客户搜索" style="width:120px">
+                    <button class="btn" onclick="loadOrders()">🔍 筛选</button>
+                    <button class="btn" onclick="clearOrderFilters()">清除</button>
+                </div>
                 <table id="orders-table"><thead><tr><th>日期</th><th>客户</th><th>商品明细</th><th>金额</th><th>状态</th><th>付款</th><th>订单号</th><th>操作</th></tr></thead><tbody></tbody></table>
             </div>
         </div>
@@ -462,6 +471,47 @@
             }
         }
         
+        function getOrderFilterParams() {
+            var from = document.getElementById('order-date-from').value;
+            var to = document.getElementById('order-date-to').value;
+            var product = document.getElementById('order-product-search').value;
+            var customer = document.getElementById('order-customer-search').value;
+            var params = [];
+            if (from) params.push('from=' + from);
+            if (to) params.push('to=' + to);
+            if (product) params.push('product=' + encodeURIComponent(product));
+            if (customer) params.push('customer=' + encodeURIComponent(customer));
+            return params.length > 0 ? '?' + params.join('&') : '';
+        }
+
+        function clearOrderFilters() {
+            document.getElementById('order-date-from').value = '';
+            document.getElementById('order-date-to').value = '';
+            document.getElementById('order-product-search').value = '';
+            document.getElementById('order-customer-search').value = '';
+            loadOrders();
+        }
+
+        async function loadOrders() {
+            var orders = await fetch(API + '/orders' + getOrderFilterParams()).then(function(r) { return r.json(); });
+            var paymentText = {unpaid: '未付款', partial: '部分付款', paid: '已付清'};
+            var html = '';
+            orders.forEach(function(o) {
+                var items = o.items.map(function(i) { return i.product_name + '×' + i.quantity; }).join(', ');
+                html += '<tr>';
+                html += '<td>' + new Date(o.created_at).toLocaleDateString() + '</td>';
+                html += '<td>' + (o.shipping_name || '-') + '</td>';
+                html += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + items + '</td>';
+                html += '<td class="highlight">¥' + o.total_amount + '</td>';
+                html += '<td><span class="status ' + o.status + '">' + o.status + '</span></td>';
+                html += '<td><span class="payment-status ' + (o.payment_status || 'unpaid') + '">' + (paymentText[o.payment_status] || '未付款') + '</span></td>';
+                html += '<td>' + o.order_no + '</td>';
+                html += '<td><button class="btn-sm" onclick="downloadPDF(' + o.id + ')">📄</button></td>';
+                html += '</tr>';
+            });
+            document.querySelector('#orders-table tbody').innerHTML = html;
+        }
+
         function getPeriodParams() {
             var params = '?period=' + currentPeriod;
             if (currentPeriod === 'custom') {
@@ -497,23 +547,7 @@
             }
             
             if (section === 'orders') {
-                var orders = await fetch(API + '/orders').then(function(r) { return r.json(); });
-                var paymentText = {unpaid: '未付款', partial: '部分付款', paid: '已付清'};
-                var html = '';
-                orders.forEach(function(o) {
-                    var items = o.items.map(function(i) { return i.product_name + '×' + i.quantity; }).join(', ');
-                    html += '<tr>';
-                    html += '<td>' + new Date(o.created_at).toLocaleDateString() + '</td>';
-                    html += '<td>' + (o.shipping_name || '-') + '</td>';
-                    html += '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + items + '</td>';
-                    html += '<td class="highlight">¥' + o.total_amount + '</td>';
-                    html += '<td><span class="status ' + o.status + '">' + o.status + '</span></td>';
-                    html += '<td><span class="payment-status ' + (o.payment_status || 'unpaid') + '">' + (paymentText[o.payment_status] || '未付款') + '</span></td>';
-                    html += '<td class="text-muted">' + o.order_no + '</td>';
-                    html += '<td><button class="btn" onclick="downloadPDF(' + o.id + ')">PDF</button></td>';
-                    html += '</tr>';
-                });
-                document.querySelector('#orders-table tbody').innerHTML = html;
+                await loadOrders();
             }
             
             if (section === 'products') {
@@ -553,13 +587,13 @@
                 var customers = await fetch(API + '/customers').then(function(r) { return r.json(); });
                 var html = '';
                 customers.forEach(function(c) {
-                    var outstanding = (c.tr || 0) - (c.tp || 0);
+                    var outstanding = (c.total_receivable || 0) - (c.total_paid || 0);
                     html += '<tr>';
                     html += '<td>' + c.name + '</td>';
                     html += '<td>' + (c.phone || '-') + '</td>';
-                    html += '<td>' + (c.oc || 0) + '</td>';
-                    html += '<td class="highlight">¥' + (c.tr || 0) + '</td>';
-                    html += '<td>¥' + (c.tp || 0) + '</td>';
+                    html += '<td>' + (c.order_count || 0) + '</td>';
+                    html += '<td class="highlight">¥' + (c.total_receivable || 0) + '</td>';
+                    html += '<td>¥' + (c.total_paid || 0) + '</td>';
                     html += '<td style="color:' + (outstanding > 0 ? '#dc3545' : '#28a745') + '">¥' + outstanding + '</td>';
                     html += '</tr>';
                 });

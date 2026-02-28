@@ -33,13 +33,46 @@ function findProduct(name) {
 
 // 获取所有订单
 app.get('/api/orders', (req, res) => {
-    const orders = db.prepare(`
+    const { from, to, product, customer } = req.query;
+
+    let whereClause = '';
+    const params = [];
+
+    if (from && to) {
+        whereClause += ' WHERE date(o.created_at) BETWEEN ? AND ?';
+        params.push(from, to);
+    } else if (from) {
+        whereClause += ' WHERE date(o.created_at) >= ?';
+        params.push(from);
+    } else if (to) {
+        whereClause += ' WHERE date(o.created_at) <= ?';
+        params.push(to);
+    }
+
+    let orders = db.prepare(`
         SELECT o.*, c.name as customer_name, c.phone as customer_phone
         FROM orders o
         LEFT JOIN customers c ON o.customer_id = c.id
+        ${whereClause}
         ORDER BY o.created_at DESC
-    `).all();
-    
+    `).all(...params);
+
+    // 如果有客户筛选
+    if (customer) {
+        orders = orders.filter(o => o.customer_name && o.customer_name.includes(customer));
+    }
+
+    // 如果有品名筛选，需要先获取订单ID
+    if (product) {
+        const productOrders = db.prepare(`
+            SELECT DISTINCT order_id FROM order_items oi
+            LEFT JOIN products p ON oi.product_id = p.id
+            WHERE p.name LIKE ?
+        `).all('%' + product + '%');
+        const orderIds = new Set(productOrders.map(o => o.order_id));
+        orders = orders.filter(o => orderIds.has(o.id));
+    }
+
     const ordersWithItems = orders.map(order => {
         const items = db.prepare(`
             SELECT oi.*, p.name as product_name
@@ -49,7 +82,7 @@ app.get('/api/orders', (req, res) => {
         `).all(order.id);
         return { ...order, items };
     });
-    
+
     res.json(ordersWithItems);
 });
 
@@ -163,7 +196,8 @@ app.get('/api/customer/:id/orders', (req, res) => {
 // 获取客户列表（带应收款）
 app.get('/api/customers', (req, res) => {
     const customers = db.prepare(`
-        SELECT c.*, 
+        SELECT c.*,
+            COUNT(o.id) as order_count,
             COALESCE(SUM(o.total_amount), 0) as total_receivable,
             COALESCE(SUM(o.paid_amount), 0) as total_paid
         FROM customers c
@@ -234,19 +268,20 @@ app.post('/api/products/:id/aliases', (req, res) => {
 // 统计报表
 app.get('/api/stats', (req, res) => {
     const todayOrders = db.prepare(`
-        SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total
+        SELECT COUNT(*) as cnt, COALESCE(SUM(total_amount), 0) as tot
         FROM orders
         WHERE date(created_at) = date('now')
     `).get();
-    
+
     const totalOrders = db.prepare(`
-        SELECT COUNT(*) as count, COALESCE(SUM(total_amount), 0) as total
+        SELECT COUNT(*) as cnt, COALESCE(SUM(total_amount), 0) as tot
         FROM orders
     `).get();
-    
+
     const topProducts = db.prepare(`
-        SELECT product_name, SUM(quantity) as total_qty, SUM(subtotal) as total
+        SELECT product_name, category, SUM(quantity) as total_qty, SUM(subtotal) as total
         FROM order_items
+        LEFT JOIN products ON order_items.product_id = products.id
         GROUP BY product_name
         ORDER BY total_qty DESC
         LIMIT 5
@@ -267,8 +302,8 @@ app.get('/api/stats', (req, res) => {
     `).get();
     
     res.json({
-        today: todayOrders,
-        total: totalOrders,
+        today: { count: todayOrders.cnt, total: todayOrders.tot },
+        total: { count: totalOrders.cnt, total: totalOrders.tot },
         topProducts,
         stock: stockList,
         receivable: {
@@ -277,6 +312,20 @@ app.get('/api/stats', (req, res) => {
             outstanding: receivable.total - receivable.paid
         }
     });
+});
+
+// 客户消费排行
+app.get('/api/stats/top-customers', (req, res) => {
+    const topCustomers = db.prepare(`
+        SELECT c.name, COUNT(o.id) as order_count, COALESCE(SUM(o.total_amount), 0) as total
+        FROM customers c
+        LEFT JOIN orders o ON c.id = o.customer_id
+        GROUP BY c.id
+        HAVING order_count > 0
+        ORDER BY total DESC
+        LIMIT 10
+    `).all();
+    res.json(topCustomers);
 });
 
 // 批量更新库存
@@ -491,7 +540,9 @@ app.get('/api/stats/top-products', (req, res) => {
 // 进货记录API
 app.get('/api/purchases', (req, res) => {
     const purchases = db.prepare(`
-        SELECT p.*, s.name as supplier_name
+        SELECT p.id, p.supplier_id, p.product_name, p.category, p.specs,
+               p.quantity, p.unit_price, p.total_amount, p.purchase_date,
+               p.note, p.created_at, s.name as supplier_name
         FROM purchases p
         LEFT JOIN suppliers s ON p.supplier_id = s.id
         ORDER BY p.purchase_date DESC, p.id DESC
