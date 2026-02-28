@@ -460,10 +460,11 @@ app.get('/api/suppliers', (req, res) => {
     res.json(suppliers);
 });
 
-// 生成PDF订单 - 使用 html-pdf
-const pdf = require('html-pdf');
+// 生成PDF订单 - 使用 pdf-lib
+const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
+const fs = require('fs');
 
-app.get('/api/order/:id/pdf', (req, res) => {
+app.get('/api/order/:id/pdf', async (req, res) => {
     const order = db.prepare(`
         SELECT o.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
         FROM orders o
@@ -484,168 +485,98 @@ app.get('/api/order/:id/pdf', (req, res) => {
 
     const outstanding = (order.total_amount || 0) - (order.paid_amount || 0);
 
-    const itemsHTML = items.map(item => `
-        <tr>
-            <td>${item.product_name || '-'}</td>
-            <td>${item.specs || '-'}</td>
-            <td>${item.quantity}</td>
-            <td>¥${item.unit_price}</td>
-            <td>¥${item.subtotal}</td>
-        </tr>
-    `).join('');
+    // 创建 PDF
+    const pdfDoc = new PDFDocument({ size: 'A4', margin: 50 });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="order_${order.order_no}.pdf"`);
+    pdfDoc.pipe(res);
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>订单 - ${order.order_no}</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
-            padding: 40px;
-            max-width: 800px;
-            margin: 0 auto;
-            position: relative;
-            color: #333;
+    // 嵌入中文字体
+    let font = StandardFonts.Helvetica;
+    let fontBold = StandardFonts.HelveticaBold;
+    try {
+        const fontPath = path.join(__dirname, 'public', 'fonts', 'SourceHanSansSC-Regular.otf');
+        const fontBoldPath = path.join(__dirname, 'public', 'fonts', 'SourceHanSansSC-Bold.otf');
+        if (fs.existsSync(fontPath)) {
+            const fontBytes = fs.readFileSync(fontPath);
+            const fontBoldBytes = fs.readFileSync(fontBoldPath);
+            font = await pdfDoc.embedFont(fontBytes);
+            fontBold = await pdfDoc.embedFont(fontBoldBytes);
         }
-        .watermark {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-30deg);
-            opacity: 0.15;
-            z-index: 1000;
-            pointer-events: none;
-        }
-        .watermark img {
-            width: 300px;
-            height: 300px;
-        }
-        h1 {
-            text-align: center;
-            color: #3A2E35;
-            font-size: 24px;
-            margin-bottom: 30px;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            padding-bottom: 20px;
-            border-bottom: 2px solid #C4B1AE;
-        }
-        .info {
-            font-size: 14px;
-            line-height: 1.8;
-            color: #3A2E35;
-        }
-        .info strong {
-            color: #3A2E35;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-            font-size: 13px;
-        }
-        th {
-            background: #EAE5E1;
-            color: #3A2E35;
-            font-weight: 600;
-        }
-        .total-section {
-            text-align: right;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 2px solid #C4B1AE;
-        }
-        .total-row {
-            font-size: 16px;
-            margin: 8px 0;
-            color: #3A2E35;
-        }
-        .total-row.grand {
-            font-size: 20px;
-            font-weight: 600;
-        }
-        .total-row.outstanding {
-            color: #c00;
-            font-size: 18px;
-            font-weight: 600;
-        }
-        .footer {
-            margin-top: 40px;
-            text-align: center;
-            color: #7A7074;
-            font-size: 12px;
-        }
-    </style>
-</head>
-<body>
-    <div class="watermark">
-        <img src="file://${path.join(__dirname, 'public', 'stamp.png')}" />
-    </div>
-    <h1>☕ 订购单</h1>
-    <div class="header">
-        <div class="info">
-            <div><strong>订单号：</strong>${order.order_no}</div>
-            <div><strong>日期：</strong>${new Date(order.created_at).toLocaleDateString('zh-CN')}</div>
-        </div>
-        <div class="info">
-            <div><strong>客户：</strong>${order.shipping_name || order.customer_name || '-'}</div>
-            <div><strong>电话：</strong>${order.shipping_phone || order.customer_phone || '-'}</div>
-            <div><strong>地址：</strong>${order.shipping_address || order.customer_address || '-'}</div>
-        </div>
-    </div>
+    } catch (e) {
+        console.error('Font embedding error:', e.message);
+    }
 
-    <table>
-        <thead>
-            <tr>
-                <th>商品名称</th>
-                <th>规格</th>
-                <th>数量</th>
-                <th>单价</th>
-                <th>金额</th>
-            </tr>
-        </thead>
-        <tbody>
-            ${itemsHTML}
-        </tbody>
-    </table>
+    // 添加公章浮水印
+    let stampImageDoc = null;
+    try {
+        const stampImage = fs.readFileSync(path.join(__dirname, 'public', 'stamp.png'));
+        stampImageDoc = await pdfDoc.embedPng(stampImage);
+    } catch (e) {
+        // 没有公章图片
+    }
 
-    <div class="total-section">
-        <div class="total-row grand"><strong>合计：¥${order.total_amount}</strong></div>
-        <div class="total-row">已付：¥${order.paid_amount || 0}</div>
-        ${outstanding > 0 ? `<div class="total-row outstanding">应收：¥${outstanding}</div>` : ''}
-    </div>
+    // 标题
+    pdfDoc.font(fontBold).fontSize(20).text('折石咖啡订单', { align: 'center' });
+    pdfDoc.moveDown();
 
-    ${order.note ? `<div class="info" style="margin-top:20px"><strong>备注：</strong>${order.note}</div>` : ''}
+    // 订单信息
+    pdfDoc.font(font).fontSize(11);
+    pdfDoc.text(`订单号: ${order.order_no}`);
+    pdfDoc.text(`日期: ${order.created_at}`);
+    pdfDoc.text(`客户: ${order.shipping_name || order.customer_name || '-'}`);
+    pdfDoc.text(`电话: ${order.shipping_phone || order.customer_phone || '-'}`);
+    pdfDoc.text(`地址: ${order.shipping_address || order.customer_address || '-'}`);
+    pdfDoc.moveDown();
 
-    <div class="footer">
-        <p>上海欧焙客贸易有限公司</p>
-    </div>
-</body>
-</html>`;
+    // 表格
+    const tableTop = pdfDoc.y;
+    pdfDoc.fontSize(10);
+    pdfDoc.text('产品', 50, tableTop);
+    pdfDoc.text('规格', 200, tableTop);
+    pdfDoc.text('数量', 320, tableTop);
+    pdfDoc.text('单价', 380, tableTop);
+    pdfDoc.text('小计', 460, tableTop);
 
-    pdf.create(html, {
-        format: 'A4',
-        orientation: 'portrait',
-        border: { top: '0', right: '0', bottom: '0', left: '0' }
-    }).toBuffer((err, buffer) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="order_${order.order_no}.pdf"`);
-        res.send(buffer);
+    pdfDoc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+
+    let y = tableTop + 25;
+    items.forEach(item => {
+        pdfDoc.text((item.product_name || '-').substring(0, 20), 50, y);
+        pdfDoc.text((item.specs || '-').substring(0, 15), 200, y);
+        pdfDoc.text(item.quantity.toString(), 320, y);
+        pdfDoc.text('¥' + item.unit_price, 380, y);
+        pdfDoc.text('¥' + item.subtotal, 460, y);
+        y += 18;
     });
+
+    // 总计
+    y += 10;
+    pdfDoc.moveTo(50, y).lineTo(550, y).stroke();
+    y += 15;
+    pdfDoc.fontSize(12).text(`合计: ¥${order.total_amount}`, 380, y);
+    pdfDoc.text(`已付: ¥${order.paid_amount || 0}`, 380, y + 18);
+    if (outstanding > 0) {
+        pdfDoc.text(`应收: ¥${outstanding}`, 380, y + 36, { color: rgb(1, 0, 0) });
+    }
+
+    // 备注
+    if (order.note) {
+        pdfDoc.moveDown(3);
+        pdfDoc.text(`备注: ${order.note}`);
+    }
+
+    // 添加公章浮水印
+    if (stampImageDoc) {
+        const stampDims = stampImageDoc.scale(0.4);
+        pdfDoc.image(stampImageDoc, 200, 250, {
+            width: stampDims.width,
+            height: stampDims.height,
+            opacity: 0.2
+        });
+    }
+
+    pdfDoc.end();
 });
 
 // 获取订单详情
