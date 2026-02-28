@@ -460,8 +460,8 @@ app.get('/api/suppliers', (req, res) => {
     res.json(suppliers);
 });
 
-// 生成PDF订单 - 使用 pdfkit
-const PDFDocument = require('pdfkit');
+// 生成PDF订单 - 使用 html-pdf
+const pdf = require('html-pdf');
 
 app.get('/api/order/:id/pdf', (req, res) => {
     const order = db.prepare(`
@@ -483,71 +483,169 @@ app.get('/api/order/:id/pdf', (req, res) => {
     `).all(order.id);
 
     const outstanding = (order.total_amount || 0) - (order.paid_amount || 0);
-    const paymentStatusText = {
-        'unpaid': '未付款',
-        'partial': '部分付款',
-        'paid': '已付清',
-        'pending': '待处理'
-    };
 
-    // 创建 PDF
-    const doc = new PDFDocument({ margin: 50 });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="order_${order.order_no}.pdf"`);
+    const itemsHTML = items.map(item => `
+        <tr>
+            <td>${item.product_name || '-'}</td>
+            <td>${item.specs || '-'}</td>
+            <td>${item.quantity}</td>
+            <td>¥${item.unit_price}</td>
+            <td>¥${item.subtotal}</td>
+        </tr>
+    `).join('');
 
-    doc.pipe(res);
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>订单 - ${order.order_no}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            color: #333;
+        }
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            opacity: 0.15;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .watermark img {
+            width: 300px;
+            height: 300px;
+        }
+        h1 {
+            text-align: center;
+            color: #3A2E35;
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #C4B1AE;
+        }
+        .info {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #3A2E35;
+        }
+        .info strong {
+            color: #3A2E35;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+        }
+        th {
+            background: #EAE5E1;
+            color: #3A2E35;
+            font-weight: 600;
+        }
+        .total-section {
+            text-align: right;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #C4B1AE;
+        }
+        .total-row {
+            font-size: 16px;
+            margin: 8px 0;
+            color: #3A2E35;
+        }
+        .total-row.grand {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        .total-row.outstanding {
+            color: #c00;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #7A7074;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark">
+        <img src="file://${path.join(__dirname, 'public', 'stamp.png')}" />
+    </div>
+    <h1>☕ 订购单</h1>
+    <div class="header">
+        <div class="info">
+            <div><strong>订单号：</strong>${order.order_no}</div>
+            <div><strong>日期：</strong>${new Date(order.created_at).toLocaleDateString('zh-CN')}</div>
+        </div>
+        <div class="info">
+            <div><strong>客户：</strong>${order.shipping_name || order.customer_name || '-'}</div>
+            <div><strong>电话：</strong>${order.shipping_phone || order.customer_phone || '-'}</div>
+            <div><strong>地址：</strong>${order.shipping_address || order.customer_address || '-'}</div>
+        </div>
+    </div>
 
-    // 标题
-    doc.fontSize(20).text('折石咖啡订单', { align: 'center' });
-    doc.moveDown();
+    <table>
+        <thead>
+            <tr>
+                <th>商品名称</th>
+                <th>规格</th>
+                <th>数量</th>
+                <th>单价</th>
+                <th>金额</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${itemsHTML}
+        </tbody>
+    </table>
 
-    // 订单信息
-    doc.fontSize(12);
-    doc.text(`订单号: ${order.order_no}`);
-    doc.text(`日期: ${order.created_at}`);
-    doc.text(`客户: ${order.customer_name || '-'}`);
-    doc.text(`电话: ${order.customer_phone || '-'}`);
-    doc.text(`地址: ${order.customer_address || '-'}`);
-    doc.moveDown();
+    <div class="total-section">
+        <div class="total-row grand"><strong>合计：¥${order.total_amount}</strong></div>
+        <div class="total-row">已付：¥${order.paid_amount || 0}</div>
+        ${outstanding > 0 ? `<div class="total-row outstanding">应收：¥${outstanding}</div>` : ''}
+    </div>
 
-    // 表格标题
-    const tableTop = doc.y;
-    doc.fontSize(11).text('产品', 50, tableTop)
-       .text('规格', 180, tableTop)
-       .text('数量', 280, tableTop)
-       .text('单价', 340, tableTop)
-       .text('小计', 430, tableTop, { width: 80, align: 'right' });
+    ${order.note ? `<div class="info" style="margin-top:20px"><strong>备注：</strong>${order.note}</div>` : ''}
 
-    doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+    <div class="footer">
+        <p>上海欧焙客贸易有限公司</p>
+    </div>
+</body>
+</html>`;
 
-    // 表格内容
-    let y = tableTop + 25;
-    items.forEach(item => {
-        doc.text(item.product_name || '-', 50, y)
-           .text(item.specs || '-', 180, y)
-           .text(item.quantity.toString(), 280, y)
-           .text('¥' + item.unit_price, 340, y)
-           .text('¥' + item.subtotal, 430, y, { width: 80, align: 'right' });
-        y += 20;
+    pdf.create(html, {
+        format: 'A4',
+        orientation: 'portrait',
+        border: { top: '0', right: '0', bottom: '0', left: '0' }
+    }).toBuffer((err, buffer) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="order_${order.order_no}.pdf"`);
+        res.send(buffer);
     });
-
-    // 总计
-    y += 10;
-    doc.moveTo(50, y).lineTo(550, y).stroke();
-    y += 15;
-    doc.fontSize(12).text(`合计: ¥${order.total_amount}`, 300, y, { width: 200, align: 'right' });
-    doc.text(`已付: ¥${order.paid_amount || 0}`, 300, y + 20, { width: 200, align: 'right' });
-    if (outstanding > 0) {
-        doc.fillColor('red').text(`应收: ¥${outstanding}`, 300, y + 40, { width: 200, align: 'right' }).fillColor('black');
-    }
-
-    // 备注
-    if (order.note) {
-        doc.moveDown(3);
-        doc.text(`备注: ${order.note}`);
-    }
-
-    doc.end();
 });
 
 // 获取订单详情
