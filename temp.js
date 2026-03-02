@@ -4,8 +4,89 @@ const path = require('path');
 const { exec } = require('child_process');
 
 const app = express();
-const PORT = 5271;
+const PORT = 5126;
 const db = new Database(path.join(__dirname, 'data/erp.db'));
+
+// 数据库迁移 - 添加发货字段
+try {
+    db.exec(`
+        ALTER TABLE order_items ADD COLUMN shipped_quantity INTEGER DEFAULT 0;
+        ALTER TABLE order_items ADD COLUMN shipping_status TEXT DEFAULT 'pending';
+        ALTER TABLE orders ADD COLUMN shipping_status TEXT DEFAULT 'pending';
+    `);
+    console.log('Database migration: shipping fields added');
+} catch (e) {
+    // 字段可能已存在，忽略错误
+    if (!e.message.includes('duplicate column name')) {
+        console.log('Database migration note:', e.message);
+    }
+}
+
+// 数据库迁移 - 产品新数据表
+try {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS products_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sku_code TEXT UNIQUE,
+            name_short TEXT NOT NULL,
+            name_full TEXT,
+            origin TEXT,
+            region TEXT,
+            variety TEXT,
+            process TEXT,
+            altitude TEXT,
+            grade TEXT,
+            description TEXT,
+            tags TEXT,
+            cupping_notes TEXT,
+            roast_level TEXT,
+            flavor_type TEXT,
+            acidity TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS product_specs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            spec_name TEXT NOT NULL,
+            spec_code TEXT NOT NULL,
+            weight_grams INTEGER NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            FOREIGN KEY (product_id) REFERENCES products_new(id)
+        )
+    `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS product_prices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            spec_id INTEGER NOT NULL,
+            price_type TEXT NOT NULL,
+            price REAL NOT NULL,
+            min_quantity INTEGER DEFAULT 1,
+            valid_from DATE,
+            FOREIGN KEY (spec_id) REFERENCES product_specs(id)
+        )
+    `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS product_categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            category_type TEXT NOT NULL,
+            category_name TEXT NOT NULL,
+            FOREIGN KEY (product_id) REFERENCES products_new(id)
+        )
+    `);
+
+    console.log('Database migration: product tables created');
+} catch (e) {
+    if (!e.message.includes('already exists')) {
+        console.log('Database migration note:', e.message);
+    }
+}
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -50,7 +131,11 @@ app.get('/api/orders', (req, res) => {
     }
 
     let orders = db.prepare(`
-        SELECT o.*, c.name as customer_name, c.phone as customer_phone
+        SELECT o.*, c.name as customer_name, c.phone as customer_phone,
+            (SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.order_id = o.id) as total_items,
+            (SELECT SUM(COALESCE(oi.shipped_quantity, 0)) FROM order_items oi WHERE oi.order_id = o.id) as shipped_items,
+            (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id AND oi.shipping_status = 'shipped') as fully_shipped_items,
+            (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id AND oi.shipping_status = 'partial') as partial_shipped_items
         FROM orders o
         LEFT JOIN customers c ON o.customer_id = c.id
         ${whereClause}
@@ -73,17 +158,97 @@ app.get('/api/orders', (req, res) => {
         orders = orders.filter(o => orderIds.has(o.id));
     }
 
+    // 计算整体发货状态并返回
     const ordersWithItems = orders.map(order => {
+        // 计算整体发货状态
+        let shipping_status = 'pending';
+        const totalItems = order.total_items || 0;
+        const shippedItems = order.shipped_items || 0;
+
+        if (shippedItems > 0 && shippedItems < totalItems) {
+            shipping_status = 'partial';
+        } else if (shippedItems >= totalItems && totalItems > 0) {
+            shipping_status = 'shipped';
+        }
+
         const items = db.prepare(`
             SELECT oi.*, p.name as product_name
             FROM order_items oi
             LEFT JOIN products p ON oi.product_id = p.id
             WHERE oi.order_id = ?
         `).all(order.id);
-        return { ...order, items };
+        return { ...order, items, shipping_status, total_items: totalItems, shipped_items: shippedItems };
     });
 
     res.json(ordersWithItems);
+});
+
+// 获取订单详情
+app.get('/api/orders/:id', (req, res) => {
+    const order = db.prepare(`
+        SELECT o.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
+        FROM orders o
+        LEFT JOIN customers c ON o.customer_id = c.id
+        WHERE o.id = ?
+    `).get(req.params.id);
+
+    if (!order) {
+        return res.status(404).json({ error: '订单不存在' });
+    }
+
+    const items = db.prepare(`
+        SELECT oi.*, p.name as product_name, p.specs
+        FROM order_items oi
+        LEFT JOIN products p ON oi.product_id = p.id
+        WHERE oi.order_id = ?
+    `).all(order.id);
+
+    res.json({ ...order, items });
+});
+
+// 发货接口
+app.post('/api/orders/:id/ship', (req, res) => {
+    const { items } = req.body; // items: [{ item_id: 1, ship_quantity: 5 }]
+
+    try {
+        items.forEach(item => {
+            // 获取当前订单项信息
+            const orderItem = db.prepare('SELECT * FROM order_items WHERE id = ?').get(item.item_id);
+            if (!orderItem) return;
+
+            const newShippedQty = (orderItem.shipped_quantity || 0) + item.ship_quantity;
+            const status = newShippedQty >= orderItem.quantity ? 'shipped' :
+                         newShippedQty > 0 ? 'partial' : 'pending';
+
+            db.prepare(`
+                UPDATE order_items
+                SET shipped_quantity = ?, shipping_status = ?
+                WHERE id = ?
+            `).run(newShippedQty, status, item.item_id);
+        });
+
+        // 更新订单整体发货状态
+        const orderItems = db.prepare(`
+            SELECT shipping_status FROM order_items WHERE order_id = ?
+        `).all(req.params.id);
+
+        let orderStatus = 'pending';
+        const shippedCount = orderItems.filter(i => i.shipping_status === 'shipped').length;
+        const partialCount = orderItems.filter(i => i.shipping_status === 'partial').length;
+
+        if (shippedCount === orderItems.length && orderItems.length > 0) {
+            orderStatus = 'shipped';
+        } else if (shippedCount > 0 || partialCount > 0) {
+            orderStatus = 'partial';
+        }
+
+        db.prepare('UPDATE orders SET shipping_status = ? WHERE id = ?')
+          .run(orderStatus, req.params.id);
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // 创建订单
@@ -235,6 +400,29 @@ app.get('/api/products', (req, res) => {
     });
     products.forEach(p => {
         p.aliases = aliasMap[p.id] || [];
+        // 解析note中的价格信息
+        if (p.note && p.note.startsWith('{')) {
+            try {
+                const pricing = JSON.parse(p.note);
+                p.pricing = {
+                    full_name: pricing.full_name,
+                    tasting_notes: pricing.tasting_notes,
+                    flavor: pricing.flavor,
+                    roast: pricing.roast,
+                    region: pricing.region,
+                    taobao_price: pricing.taobao_price,
+                    cost: pricing.cost,
+                    green_bean_cost: pricing.green_bean_cost,
+                    merchant_price: pricing.merchant_price,
+                    bulk_price: pricing.bulk_price,
+                    super_bulk_price: pricing.super_bulk_price
+                };
+            } catch (e) {
+                p.pricing = null;
+            }
+        } else {
+            p.pricing = null;
+        }
     });
     res.json(products);
 });
@@ -249,6 +437,31 @@ app.get('/api/products/search', (req, res) => {
         WHERE p.name LIKE ? OR a.alias LIKE ?
         LIMIT 10
     `).all('%' + q + '%', '%' + q + '%');
+    // 解析价格信息
+    products.forEach(p => {
+        if (p.note && p.note.startsWith('{')) {
+            try {
+                const pricing = JSON.parse(p.note);
+                p.pricing = {
+                    full_name: pricing.full_name,
+                    tasting_notes: pricing.tasting_notes,
+                    flavor: pricing.flavor,
+                    roast: pricing.roast,
+                    region: pricing.region,
+                    taobao_price: pricing.taobao_price,
+                    cost: pricing.cost,
+                    green_bean_cost: pricing.green_bean_cost,
+                    merchant_price: pricing.merchant_price,
+                    bulk_price: pricing.bulk_price,
+                    super_bulk_price: pricing.super_bulk_price
+                };
+            } catch (e) {
+                p.pricing = null;
+            }
+        } else {
+            p.pricing = null;
+        }
+    });
     res.json(products);
 });
 
@@ -261,6 +474,62 @@ app.post('/api/products', (req, res) => {
             VALUES (?, ?, ?, ?, ?, ?)
         `).run(name, category, specs, price, cost, stock || 0);
         res.json({ success: true, id: result.lastInsertRowid });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 更新产品
+app.put('/api/products/:id', (req, res) => {
+    const productId = req.params.id;
+    const { name, category, specs, price, cost, stock, full_name, roast, flavor, region, tasting_notes, merchant_price, bulk_price, super_bulk_price } = req.body;
+
+    try {
+        // 先获取现有note
+        const existing = db.prepare('SELECT note FROM products WHERE id = ?').get(productId);
+        let pricing = {};
+        if (existing && existing.note && existing.note.startsWith('{')) {
+            try { pricing = JSON.parse(existing.note); } catch(e) {}
+        }
+
+        // 更新pricing字段
+        if (full_name !== undefined) pricing.full_name = full_name;
+        if (roast !== undefined) pricing.roast = roast;
+        if (flavor !== undefined) pricing.flavor = flavor;
+        if (region !== undefined) pricing.region = region;
+        if (tasting_notes !== undefined) pricing.tasting_notes = tasting_notes;
+        if (merchant_price !== undefined) pricing.merchant_price = merchant_price;
+        if (bulk_price !== undefined) pricing.bulk_price = bulk_price;
+        if (super_bulk_price !== undefined) pricing.super_bulk_price = super_bulk_price;
+
+        const newNote = JSON.stringify(pricing);
+
+        // 更新产品
+        db.prepare(`
+            UPDATE products
+            SET name = COALESCE(?, name),
+                category = COALESCE(?, category),
+                specs = COALESCE(?, specs),
+                price = COALESCE(?, price),
+                cost = COALESCE(?, cost),
+                stock = COALESCE(?, stock),
+                note = ?
+            WHERE id = ?
+        `).run(name, category, specs, price, cost, stock, newNote, productId);
+
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 删除产品
+app.delete('/api/products/:id', (req, res) => {
+    const productId = req.params.id;
+    try {
+        db.prepare('DELETE FROM product_aliases WHERE product_id = ?').run(productId);
+        db.prepare('DELETE FROM products WHERE id = ?').run(productId);
+        res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -279,6 +548,101 @@ app.post('/api/products/:id/aliases', (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+});
+
+// ============ 新产品数据 API ============
+
+// 获取新产品列表
+app.get('/api/products-new', (req, res) => {
+    const { origin, active } = req.query;
+
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+
+    if (origin) {
+        whereClause += ' AND p.origin = ?';
+        params.push(origin);
+    }
+
+    if (active !== undefined) {
+        whereClause += ' AND p.is_active = ?';
+        params.push(active === 'true' ? 1 : 0);
+    }
+
+    // 先获取产品列表
+    const products = db.prepare(`
+        SELECT * FROM products_new p
+        ${whereClause}
+        ORDER BY p.name_short
+    `).all(...params);
+
+    // 获取每个产品的规格和价格
+    const result = products.map(p => {
+        const specs = db.prepare(`
+            SELECT s.*,
+                (SELECT json_group_array(json_object(
+                    'price_type', pp.price_type,
+                    'price', pp.price,
+                    'min_quantity', pp.min_quantity
+                )) FROM product_prices pp WHERE pp.spec_id = s.id) as prices_json
+            FROM product_specs s
+            WHERE s.product_id = ? AND s.is_active = 1
+        `).all(p.id);
+
+        return {
+            ...p,
+            specs: specs.map(s => ({
+                id: s.id,
+                spec_name: s.spec_name,
+                spec_code: s.spec_code,
+                weight_grams: s.weight_grams,
+                prices: JSON.parse(s.prices_json || '[]')
+            }))
+        };
+    });
+
+    res.json(result);
+});
+
+// 获取新产品详情
+app.get('/api/products-new/:id', (req, res) => {
+    const product = db.prepare('SELECT * FROM products_new WHERE id = ?').get(req.params.id);
+
+    if (!product) {
+        return res.status(404).json({ error: '产品不存在' });
+    }
+
+    // 获取规格和价格
+    const specs = db.prepare(`
+        SELECT s.*,
+            (SELECT json_group_array(json_object(
+                'price_type', pp.price_type,
+                'price', pp.price,
+                'min_quantity', pp.min_quantity
+            )) FROM product_prices pp WHERE pp.spec_id = s.id) as prices_json
+        FROM product_specs s
+        WHERE s.product_id = ? AND s.is_active = 1
+    `).all(product.id);
+
+    // 获取分类
+    const categories = db.prepare(`
+        SELECT * FROM product_categories WHERE product_id = ?
+    `).all(product.id);
+
+    res.json({
+        ...product,
+        specs: specs.map(s => ({
+            id: s.id,
+            spec_name: s.spec_name,
+            spec_code: s.spec_code,
+            weight_grams: s.weight_grams,
+            prices: JSON.parse(s.prices_json || '[]')
+        })),
+        categories: categories.map(c => ({
+            category_type: c.category_type,
+            category_name: c.category_name
+        }))
+    });
 });
 
 // 统计报表
@@ -510,13 +874,15 @@ app.get('/api/order/:id/pdf', async (req, res) => {
 
     // 标题
     doc.font(fontBoldName).fontSize(20).text('折石咖啡订单', { align: 'center' });
+    doc.font(fontName).fontSize(10).text('上海欧焙客贸易有限公司', { align: 'center' });
     doc.moveDown();
 
     // 订单信息
     doc.font(fontName).fontSize(11);
     doc.text(`订单号: ${order.order_no}`);
     doc.text(`日期: ${order.created_at}`);
-    doc.text(`客户: ${order.shipping_name || order.customer_name || '-'}`);
+    doc.text(`订购人: ${order.customer_name || '-'}`);
+    doc.text(`收件人: ${order.shipping_name || order.customer_name || '-'}`);
     doc.text(`电话: ${order.shipping_phone || order.customer_phone || '-'}`);
     doc.text(`地址: ${order.shipping_address || order.customer_address || '-'}`);
     doc.moveDown();
@@ -524,8 +890,9 @@ app.get('/api/order/:id/pdf', async (req, res) => {
     // 表格
     const tableTop = doc.y;
     doc.fontSize(10);
-    doc.text('产品', 50, tableTop);
-    doc.text('规格', 200, tableTop);
+    doc.text('序号', 50, tableTop);
+    doc.text('产品', 80, tableTop);
+    doc.text('规格', 220, tableTop);
     doc.text('数量', 320, tableTop);
     doc.text('单价', 380, tableTop);
     doc.text('小计', 460, tableTop);
@@ -533,20 +900,33 @@ app.get('/api/order/:id/pdf', async (req, res) => {
     doc.moveTo(50, tableTop + 15).lineTo(550, tableTop + 15).stroke();
 
     let y = tableTop + 25;
-    items.forEach(item => {
-        doc.text((item.product_name || '-').substring(0, 20), 50, y);
-        doc.text((item.specs || '-').substring(0, 15), 200, y);
+    let subtotal = 0;
+    items.forEach((item, index) => {
+        doc.text((index + 1).toString(), 50, y);
+        doc.text((item.product_name || '-').substring(0, 18), 80, y);
+        doc.text((item.specs || '-').substring(0, 12), 220, y);
         doc.text(item.quantity.toString(), 320, y);
         doc.text('¥' + item.unit_price, 380, y);
         doc.text('¥' + item.subtotal, 460, y);
+        subtotal += item.subtotal || 0;
         y += 18;
     });
+
+    // 获取运费（从备注中解析或使用默认值）
+    const shippingFee = order.shipping_fee || 0;
+    const totalWithShipping = subtotal + shippingFee;
 
     // 总计
     y += 10;
     doc.moveTo(50, y).lineTo(550, y).stroke();
     y += 15;
-    doc.fontSize(12).text(`合计: ¥${order.total_amount}`, 380, y);
+    if (shippingFee > 0) {
+        doc.fontSize(11).text(`产品小计: ¥${subtotal}`, 320, y);
+        doc.text(`运费: ¥${shippingFee}`, 320, y + 16);
+        doc.fontSize(12).text(`合计: ¥${totalWithShipping}`, 380, y + 34);
+    } else {
+        doc.fontSize(12).text(`合计: ¥${order.total_amount}`, 380, y);
+    }
     doc.text(`已付: ¥${order.paid_amount || 0}`, 380, y + 18);
     if (outstanding > 0) {
         doc.text(`应收: ¥${outstanding}`, 380, y + 36, { color: '#ff0000' });

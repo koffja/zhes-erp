@@ -6,6 +6,7 @@
 
 ### 核心功能
 - **订单管理** - 创建、查询、筛选订单，支持日期/客户/商品筛选
+- **分次发货** - 订单项单独追踪已发数量，支持部分发货
 - **客户管理** - 客户信息维护（姓名、电话、地址）
 - **商品管理** - 产品目录管理，支持别名匹配
 - **库存管理** - 库存追踪与预警
@@ -27,14 +28,16 @@ npm install
 ### 启动服务
 
 ```bash
-# 开发模式
+# 启动后端服务
 node temp.js
 
 # 或使用服务脚本（后台运行）
 ./server.sh start
 ```
 
-服务启动后访问 http://localhost:5271
+服务启动后访问：
+- 后端 API: http://localhost:5126
+- 前端页面: http://localhost:5271
 
 ### 服务管理命令
 
@@ -55,19 +58,24 @@ sudo launchctl load /Library/LaunchDaemons/com.coffee.erp.plist
 ## 技术栈
 
 - **后端**: Express.js + better-sqlite3
-- **前端**: 原生 HTML/CSS/JS
-- **PDF**: pdfkit + html-pdf
+- **前端**: Vue 3 + Vite
+- **PDF**: pdfkit
 - **字体**: 思源黑体 + 阿里普惠体
 
 ## 项目结构
 
 ```
 .
-├── temp.js              # 主服务器入口
+├── temp.js              # 后端服务器入口
 ├── server.sh            # 服务管理脚本
 ├── com.coffee.erp.plist # macOS LaunchDaemon 配置
+├── frontend/             # Vue 3 前端
+│   ├── src/
+│   │   ├── views/       # 页面组件
+│   │   ├── api/         # API 调用
+│   │   └── style.css    # 品牌样式
+│   └── vite.config.js
 ├── public/
-│   ├── index.html       # 前端页面
 │   ├── fonts/           # 中文字体
 │   └── stamp.png        # PDF 浮水印图片
 ├── data/
@@ -86,13 +94,17 @@ sudo launchctl load /Library/LaunchDaemons/com.coffee.erp.plist
 | product_aliases | 产品别名 |
 | customers | 客户信息 |
 | inventory | 库存 |
+| suppliers | 供应商 |
+| purchases | 进货记录 |
 
 ## API 接口
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | /api/orders | 获取订单列表 |
+| GET | /api/orders | 获取订单列表（含发货统计） |
 | POST | /api/orders | 创建订单 |
+| GET | /api/orders/:id | 获取订单详情（含发货状态） |
+| POST | /api/orders/:id/ship | 发货（支持分次发货） |
 | GET | /api/orders/:id/pdf | 导出订单 PDF |
 | GET | /api/products | 获取产品列表 |
 | POST | /api/products | 创建产品 |
@@ -101,6 +113,15 @@ sudo launchctl load /Library/LaunchDaemons/com.coffee.erp.plist
 | GET | /api/inventory | 获取库存 |
 | POST | /api/inventory | 更新库存 |
 | GET | /api/stats | 销售统计 |
+
+## 品牌色彩
+
+使用紫岩霞光（Morandi Porphyry）配色系统：
+
+- `--zhe-dark-porphyry`: #3A2E35（深紫灰）
+- `--zhe-ash-rose`: #C4B1AE（灰玫瑰）
+- `--zhe-tuff-white`: #EAE5E1（凝灰白）
+- `--zhe-oatmeal-stone`: #F5F0EB（燕麦灰）
 
 ## 许可证
 
