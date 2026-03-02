@@ -1,0 +1,225 @@
+/* ========================================
+  Zhe's Coffee - Morandi Porphyry Color System
+  折石咖啡 - 紫岩霞光 品牌色彩變數庫
+  ======================================== */
+
+:root {
+  /* 第一層：基礎色板 */
+  --zhe-dark-porphyry: #3A2E35;
+  --zhe-ash-rose: #C4B1AE;
+  --zhe-tuff-white: #EAE5E1;
+  --zhe-oatmeal-stone: #F5F0EB;
+  --zhe-obsidian-ash: #1A1518;
+  --zhe-weathered-gray: #7A7074;
+  --zhe-ash-rose-hover: #D8C9C6;
+  --zhe-ash-rose-active: #AD9794;
+  --zhe-terracotta: #C17D6B; /* 莫兰迪赤陶色 - 柔和的红色替代 */
+  --zhe-terracotta-hover: #A86858;
+
+  /* 第二層：語義化變數 - 淺色模式 */
+  --bg-app: var(--zhe-oatmeal-stone);
+  --bg-card: #FFFFFF;
+  --bg-elevated: var(--zhe-tuff-white);
+
+  --text-primary: var(--zhe-dark-porphyry);
+  --text-secondary: var(--zhe-dark-porphyry);
+  --text-muted: var(--zhe-weathered-gray);
+  --text-inverse: var(--zhe-tuff-white);
+
+  --border-subtle: #D1C9C7;
+  --border-strong: var(--zhe-dark-porphyry);
+
+  --action-primary: var(--zhe-dark-porphyry);
+  --action-primary-hover: var(--zhe-obsidian-ash);
+  --action-accent: var(--zhe-ash-rose);
+  --action-accent-hover: var(--zhe-ash-rose-hover);
+  --action-accent-active: var(--zhe-ash-rose-active);
+
+  /* 全局样式 */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text-primary);
+  background-color: var(--bg-app);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 深色模式 - 仅支持手动切换 */
+.dark {
+  --bg-app: var(--zhe-obsidian-ash);
+  --bg-card: var(--zhe-dark-porphyry);
+  --bg-elevated: #281F24;
+  --text-primary: var(--zhe-tuff-white);
+  --text-secondary: var(--zhe-ash-rose);
+  --text-muted: var(--zhe-weathered-gray);
+  --text-inverse: var(--zhe-obsidian-ash);
+  --border-subtle: #4D3D46;
+  --border-strong: var(--zhe-ash-rose);
+  --action-primary: var(--zhe-tuff-white);
+  --action-primary-hover: #FFFFFF;
+  --action-accent: var(--zhe-ash-rose);
+  --action-accent-hover: var(--zhe-ash-rose-hover);
+  --zhe-oatmeal-stone: #2A2428; /* 深色模式下的表格奇数行背景 */
+  --zhe-ash-rose-hover: #3D3338; /* 深色模式下的表格悬停背景 */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* 链接 */
+a {
+  color: var(--action-primary);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--action-accent);
+}
+
+/* 按钮 */
+button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--action-primary);
+  color: var(--text-inverse);
+}
+button:hover {
+  background: var(--action-primary-hover);
+}
+button.secondary {
+  background: var(--action-accent);
+  color: var(--zhe-obsidian-ash);
+}
+button.secondary:hover {
+  background: var(--action-accent-hover);
+}
+button.danger {
+  background: var(--zhe-terracotta);
+  color: var(--zhe-tuff-white);
+}
+button.danger:hover {
+  background: var(--zhe-terracotta-hover);
+}
+
+/* 输入框 */
+input, select, textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--action-accent);
+}
+
+/* 表格 */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+th, td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+th {
+  background: var(--bg-app);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+tbody tr:nth-child(odd) {
+  background: var(--zhe-oatmeal-stone);
+  color: var(--text-primary);
+}
+tbody tr:nth-child(even) {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+tbody tr:hover {
+  background: var(--zhe-ash-rose-hover);
+}
+
+/* 工具类 */
+.highlight {
+  font-weight: 600;
+  color: var(--action-accent);
+}
+.text-muted {
+  color: var(--text-muted);
+}
+.flex {
+  display: flex;
+}
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gap-2 {
+  gap: 8px;
+}
+.gap-4 {
+  gap: 16px;
+}
+.mb-2 {
+  margin-bottom: 8px;
+}
+.mb-4 {
+  margin-bottom: 16px;
+}
+.mt-4 {
+  margin-top: 16px;
+}
+.p-4 {
+  padding: 16px;
+}
+
+/* 卡片 */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(58, 46, 53, 0.08);
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-app);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--zhe-weathered-gray);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--zhe-dark-porphyry);
+}

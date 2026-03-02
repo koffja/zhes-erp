@@ -22,6 +22,27 @@ try {
     }
 }
 
+// 数据库迁移 - 添加订单日期字段
+try {
+    db.exec(`ALTER TABLE orders ADD COLUMN order_date DATE;`);
+} catch (e) {
+    // 字段可能已存在
+}
+
+// 修复订单日期（从订单号正确提取）
+db.exec(`
+    UPDATE orders SET order_date =
+        '20' || substr(order_no, 6, 2) || '-' ||
+        substr(order_no, 8, 2) || '-' ||
+        substr(order_no, 10, 2)
+    WHERE order_no LIKE 'XSD%' AND LENGTH(order_no) >= 12 AND order_date IS NULL
+`);
+db.exec(`
+    UPDATE orders SET order_date = date(created_at)
+    WHERE order_no LIKE 'ORD%' AND order_date IS NULL
+`);
+console.log('Database migration: order_date field updated');
+
 // 数据库迁移 - 产品新数据表
 try {
     db.exec(`
@@ -286,8 +307,8 @@ app.post('/api/orders', (req, res) => {
         }
         
         const orderResult = db.prepare(`
-            INSERT INTO orders (order_no, customer_id, total_amount, status, shipping_name, shipping_phone, shipping_address, note, payment_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unpaid')
+            INSERT INTO orders (order_no, customer_id, total_amount, status, shipping_name, shipping_phone, shipping_address, note, payment_status, order_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', date('now'))
         `).run(orderNo, custId, totalAmount, status || 'pending', customer_name, customer_phone, customer_address, note);
         
         const orderId = orderResult.lastInsertRowid;
@@ -650,20 +671,25 @@ app.get('/api/stats', (req, res) => {
     const { period, from, to } = req.query;
 
     let dateFilter = '';
-    let todayFilter = "date(created_at) = date('now')";
+    let todayFilter = "date(order_date) = date('now')";
     let periodSql = '';
     let periodParams = [];
 
     if (period === 'today') {
-        dateFilter = "date(created_at) = date('now')";
-    } else if (period === 'week') {
-        dateFilter = "date(created_at) >= date('now', '-7 days')";
+        dateFilter = "date(order_date) = date('now')";
+    } else if (period === '7days') {
+        dateFilter = "date(order_date) >= date('now', '-7 days')";
+    } else if (period === '15days') {
+        dateFilter = "date(order_date) >= date('now', '-15 days')";
+    } else if (period === '30days') {
+        dateFilter = "date(order_date) >= date('now', '-30 days')";
     } else if (period === 'month') {
-        dateFilter = "date(created_at) >= date('now', '-30 days')";
+        // 自然月：当月1号到今天
+        dateFilter = "date(order_date) >= date('now', 'start of month')";
     } else if (period === 'year') {
-        dateFilter = "date(created_at) >= date('now', '-365 days')";
+        dateFilter = "date(order_date) >= date('now', '-365 days')";
     } else if (period === 'custom' && from && to) {
-        dateFilter = "date(created_at) >= ? AND date(created_at) <= ?";
+        dateFilter = "date(order_date) >= ? AND date(order_date) <= ?";
         periodParams = [from, to];
     }
 
@@ -734,9 +760,19 @@ app.get('/api/stats', (req, res) => {
         ${periodSql}
     `).get(...periodParams);
 
+    // 期间客户数
+    const periodCustomers = db.prepare(`
+        SELECT COUNT(DISTINCT customer_id) as cnt
+        FROM orders
+        ${periodSql}
+    `).get(...periodParams);
+
     res.json({
         today: { count: todayOrders.cnt, total: todayOrders.tot },
         total: { count: periodOrders.cnt, total: periodOrders.tot },
+        period_count: periodOrders.cnt,
+        period_total: periodOrders.tot,
+        period_customers: periodCustomers.cnt,
         topProducts,
         stock: stockList,
         receivable: {
@@ -753,15 +789,19 @@ app.get('/api/stats/top-customers', (req, res) => {
 
     let dateFilter = '';
     if (period === 'today') {
-        dateFilter = "date(o.created_at) = date('now')";
-    } else if (period === 'week') {
-        dateFilter = "date(o.created_at) >= date('now', '-7 days')";
+        dateFilter = "date(o.order_date) = date('now')";
+    } else if (period === '7days') {
+        dateFilter = "date(o.order_date) >= date('now', '-7 days')";
+    } else if (period === '15days') {
+        dateFilter = "date(o.order_date) >= date('now', '-15 days')";
+    } else if (period === '30days') {
+        dateFilter = "date(o.order_date) >= date('now', '-30 days')";
     } else if (period === 'month') {
-        dateFilter = "date(o.created_at) >= date('now', '-30 days')";
+        dateFilter = "date(o.order_date) >= date('now', 'start of month')";
     } else if (period === 'year') {
-        dateFilter = "date(o.created_at) >= date('now', '-365 days')";
+        dateFilter = "date(o.order_date) >= date('now', '-365 days')";
     } else if (period === 'custom' && from && to) {
-        dateFilter = "date(o.created_at) >= date(?) AND date(o.created_at) <= date(?)";
+        dateFilter = "date(o.order_date) >= date(?) AND date(o.order_date) <= date(?)";
     }
 
     let sql, params = [];
@@ -982,15 +1022,19 @@ app.get('/api/stats/top-products', (req, res) => {
 
     let dateFilter = '';
     if (period === 'today') {
-        dateFilter = "date(o.created_at) = date('now')";
-    } else if (period === 'week') {
-        dateFilter = "date(o.created_at) >= date('now', '-7 days')";
+        dateFilter = "date(o.order_date) = date('now')";
+    } else if (period === '7days') {
+        dateFilter = "date(o.order_date) >= date('now', '-7 days')";
+    } else if (period === '15days') {
+        dateFilter = "date(o.order_date) >= date('now', '-15 days')";
+    } else if (period === '30days') {
+        dateFilter = "date(o.order_date) >= date('now', '-30 days')";
     } else if (period === 'month') {
-        dateFilter = "date(o.created_at) >= date('now', '-30 days')";
+        dateFilter = "date(o.order_date) >= date('now', 'start of month')";
     } else if (period === 'year') {
-        dateFilter = "date(o.created_at) >= date('now', '-365 days')";
+        dateFilter = "date(o.order_date) >= date('now', '-365 days')";
     } else if (period === 'custom' && from && to) {
-        dateFilter = "date(o.created_at) >= date(?) AND date(o.created_at) <= date(?)";
+        dateFilter = "date(o.order_date) >= date(?) AND date(o.order_date) <= date(?)";
     }
 
     let sql, params = [];
