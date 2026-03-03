@@ -1061,6 +1061,41 @@ app.get('/api/suppliers', (req, res) => {
 
 // 生成PDF订单 - 使用 pdfkit
 const PDFDocument = require('pdfkit');
+
+// 防伪背景水印函数（使用PDFKit的background选项）
+function createAntiCounterfeitPattern(pageWidth, pageHeight) {
+    // 创建一个临时的PDF文档来生成背景图案
+    const patternDoc = new PDFDocument({ autoFirstPage: false });
+    const patternBuffer = [];
+    patternDoc.pipe({ write: (chunk) => patternBuffer.push(chunk) });
+
+    patternDoc.addPage({ size: 'A4', margin: 0 });
+
+    // 极细微点
+    const seed = 131;
+    patternDoc.fillColor('#000000', 0.015);
+    for (let i = 0; i < Math.floor(pageHeight / 20); i++) {
+        for (let j = 0; j < Math.floor(pageWidth / 20); j++) {
+            const hash = ((seed * i + j * 7) % 100);
+            if (hash < 5) {
+                patternDoc.circle(j * 20 + 10, i * 20 + 10, 0.3).fill();
+            }
+        }
+    }
+
+    // 微小编码文字
+    patternDoc.fontSize(3);
+    patternDoc.fillColor('#000000', 0.01);
+    const code = 'SECURE';
+    for (let x = 30; x < pageWidth; x += 100) {
+        for (let y = 30; y < pageHeight; y += 30) {
+            patternDoc.text(code, x, y, { lineBreak: false });
+        }
+    }
+
+    patternDoc.end();
+    return Buffer.concat(patternBuffer);
+}
 const fs = require('fs');
 
 app.get('/api/order/:id/pdf', async (req, res) => {
@@ -1082,13 +1117,64 @@ app.get('/api/order/:id/pdf', async (req, res) => {
         WHERE oi.order_id = ?
     `).all(order.id);
 
-    const outstanding = (order.total_amount || 0) - (order.paid_amount || 0);
+    // outstanding 在后面计算
 
-    // 创建 PDF 文档
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
+    // 生成文件名: {日期}_{订购人拼音/英文}_{订单号后5位}.pdf
+    // 日期格式: YYMMDD, 订购人, 订单号后5位
+    const orderDate = order.order_date || order.created_at;
+    const dateStr = orderDate ? orderDate.replace(/-/g, '').substring(2, 8) : '000000';
+    const orderPerson = (order.customer_name || order.shipping_name || 'Customer').replace(/[\\/:*?"<>|]/g, '_');
+    const orderNoSuffix = (order.order_no || '00000').slice(-5);
+    const filename = `${dateStr}_${orderPerson}_${orderNoSuffix}.pdf`;
+
+    // 使用RFC 5987格式编码文件名，解决中文字符在HTTP header中的问题
+    const encodedFilename = encodeURIComponent(filename);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="order_${order.order_no}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
+    // PDF加密密钥
+    const pdfPassword = 'c2X5XuRoLQocgK9dBxbA7Hi+nF6jE4ITEBb90gzoWLY=';
+
+    const doc = new PDFDocument({
+        size: 'A4',
+        margins: { top: 50, bottom: 50, left: 50, right: 50 },
+        encryption: {
+            ownerPassword: pdfPassword,
+            userPassword: pdfPassword,
+            permissions: {
+                printing: 'highResolution',
+                modifying: false,
+                copying: false,
+                annotating: false,
+                fillingForms: false,
+                contentAccessibility: false,
+                documentAssembly: false
+            }
+        }
+    });
     doc.pipe(res);
+
+    // 记录页面尺寸
+    const pageWidth = 595.28;
+    const pageHeight = 841.89;
+
+    // 绘制防伪背景（使用on('page')事件）
+    let backgroundDrawn = false;
+    doc.on('page', () => {
+        if (!backgroundDrawn) {
+            backgroundDrawn = true;
+            doc.save();
+            doc.fillColor('#000000', 0.012);
+            // 极细网点
+            for (let i = 0; i < 60; i++) {
+                for (let j = 0; j < 40; j++) {
+                    if ((i * 17 + j * 13) % 20 < 2) {
+                        doc.circle(j * 15 + 30, i * 20 + 30, 0.4).fill();
+                    }
+                }
+            }
+            doc.restore();
+        }
+    });
 
     // 加载中文字体 - 阿里妈妈普惠体
     let fontName = 'Helvetica';
@@ -1115,6 +1201,7 @@ app.get('/api/order/:id/pdf', async (req, res) => {
     // 订单信息
     doc.font(fontName).fontSize(11);
     doc.text(`订单号: ${order.order_no}`);
+    const orderNoY = doc.y; // 记录订单号这一行的y位置
     doc.text(`日期: ${order.created_at}`);
     doc.text(`订购人: ${order.customer_name || '-'}`);
     doc.text(`收件人: ${order.shipping_name || order.customer_name || '-'}`);
@@ -1147,24 +1234,35 @@ app.get('/api/order/:id/pdf', async (req, res) => {
         y += 18;
     });
 
-    // 获取运费（从备注中解析或使用默认值）
+    // 获取运费
     const shippingFee = order.shipping_fee || 0;
     const totalWithShipping = subtotal + shippingFee;
+    // 应收 = 合计（含运费）- 已付
+    const outstanding = totalWithShipping - (order.paid_amount || 0);
 
     // 总计
     y += 10;
     doc.moveTo(50, y).lineTo(550, y).stroke();
-    y += 15;
+    y += 18;
+
+    // 左侧：产品小计和运费
     if (shippingFee > 0) {
-        doc.fontSize(11).text(`产品小计: ¥${subtotal}`, 320, y);
-        doc.text(`运费: ¥${shippingFee}`, 320, y + 16);
-        doc.fontSize(12).text(`合计: ¥${totalWithShipping}`, 380, y + 34);
+        doc.fontSize(11).text(`产品小计: ¥${subtotal}`, 50, y);
+        y += 16;
+        doc.text(`运费: ¥${shippingFee}`, 50, y);
+        y += 16;
+        doc.fontSize(12).text(`合计: ¥${totalWithShipping}`, 50, y);
     } else {
-        doc.fontSize(12).text(`合计: ¥${order.total_amount}`, 380, y);
+        doc.fontSize(12).text(`合计: ¥${subtotal}`, 50, y);
+        y += 16;
     }
-    doc.text(`已付: ¥${order.paid_amount || 0}`, 380, y + 18);
+
+    // 右侧：已付和应收
+    let rightY = y - 16;
+    if (shippingFee > 0) rightY = y - 32;
+    doc.text(`已付: ¥${order.paid_amount || 0}`, 320, rightY);
     if (outstanding > 0) {
-        doc.text(`应收: ¥${outstanding}`, 380, y + 36, { color: '#ff0000' });
+        doc.text(`应收: ¥${outstanding}`, 320, rightY + 16, { color: '#ff0000' });
     }
 
     // 备注
@@ -1175,9 +1273,13 @@ app.get('/api/order/:id/pdf', async (req, res) => {
 
     // 添加公章浮水印 - 在 end() 之前
     try {
+        // 公章位置："订"字上方20px，中心对齐
+        const stampX = 430;  // 向右80px
+        const stampY = orderNoY + 15;  // 向上50px (原位置-50)
+
         const stampPath = path.join(__dirname, 'public', 'stamp.png');
         if (fs.existsSync(stampPath)) {
-            doc.image(stampPath, 200, 250, {
+            doc.image(stampPath, stampX, stampY, {
                 fit: [150, 150],
                 opacity: 0.2
             });

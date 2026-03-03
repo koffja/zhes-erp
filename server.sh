@@ -56,6 +56,9 @@ stop() {
     fi
 
     rm -f "$PID_FILE"
+    # 清理日志文件，避免权限问题
+    rm -f "$LOG_FILE"
+    touch "$LOG_FILE"
     echo "服务已停止"
     return 0
 }
