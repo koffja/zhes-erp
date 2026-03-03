@@ -16,6 +16,7 @@
 - **PDF 导出** - 订单 PDF 生成，支持中文显示和浮水印
 - **暗色模式** - 紫岩霞光品牌配色系统
 - **响应式设计** - 支持移动端访问
+- **Inline编辑** - 订单、客户、商品支持点击单元格直接编辑
 
 ## 快速开始
 
@@ -44,7 +45,7 @@ node temp.js
 ```bash
 ./server.sh start    # 启动服务
 ./server.sh stop     # 停止服务
-./server.sh restart # 重启服务
+./server.sh restart  # 重启服务
 ./server.sh status   # 查看状态
 ```
 
@@ -97,22 +98,343 @@ sudo launchctl load /Library/LaunchDaemons/com.coffee.erp.plist
 | suppliers | 供应商 |
 | purchases | 进货记录 |
 
-## API 接口
+---
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | /api/orders | 获取订单列表（含发货统计） |
-| POST | /api/orders | 创建订单 |
-| GET | /api/orders/:id | 获取订单详情（含发货状态） |
-| POST | /api/orders/:id/ship | 发货（支持分次发货） |
-| GET | /api/orders/:id/pdf | 导出订单 PDF |
-| GET | /api/products | 获取产品列表 |
-| POST | /api/products | 创建产品 |
-| GET | /api/customers | 获取客户列表 |
-| POST | /api/customers | 创建客户 |
-| GET | /api/inventory | 获取库存 |
-| POST | /api/inventory | 更新库存 |
-| GET | /api/stats | 销售统计 |
+## API 接口文档
+
+### 订单 API
+
+#### 获取订单列表
+```
+GET /api/orders
+```
+
+**查询参数 (Query Parameters):**
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| page | number | 页码，默认1 | ?page=1 |
+| pageSize | number | 每页数量，默认50 | ?pageSize=50 |
+| from | string | 开始日期 (YYYY-MM-DD) | ?from=2024-01-01 |
+| to | string | 结束日期 (YYYY-MM-DD) | ?to=2024-12-31 |
+| customer | string | 客户姓名搜索 | ?customer=张三 |
+| product | string | 商品名称搜索 | ?product=黑洞 |
+| shipping_status | string | 发货状态 | ?shipping_status=shipped |
+| payment_status | string | 付款状态 | ?payment_status=paid |
+| has_items | string | 是否有商品明细 | ?has_items=1 (有) / ?has_items=0 (无) |
+
+**发货状态值:** `pending`(未发货) / `partial`(部分发货) / `shipped`(已发货)
+
+**付款状态值:** `unpaid`(未付款) / `partial`(部分付款) / `paid`(已付款)
+
+**返回格式:**
+```json
+{
+  "data": [...],
+  "total": 2098,
+  "page": 1,
+  "pageSize": 50,
+  "totalPages": 42
+}
+```
+
+---
+
+#### 获取订单详情
+```
+GET /api/orders/:id
+```
+
+**返回格式:**
+```json
+{
+  "id": 1,
+  "order_no": "ORD123456",
+  "customer_id": 1,
+  "total_amount": 500,
+  "status": "completed",
+  "shipping_name": "张三",
+  "shipping_phone": "13800138000",
+  "shipping_address": "上海市...",
+  "note": "",
+  "order_date": "2024-01-15",
+  "payment_status": "paid",
+  "shipping_status": "shipped",
+  "items": [
+    {
+      "id": 1,
+      "product_id": 1,
+      "product_name": "黑洞",
+      "quantity": 10,
+      "unit_price": 50,
+      "subtotal": 500,
+      "shipped_quantity": 10,
+      "shipping_status": "shipped",
+      "unit": "包"
+    }
+  ]
+}
+```
+
+---
+
+#### 创建订单
+```
+POST /api/orders
+```
+
+**请求体:**
+```json
+{
+  "customer_name": "张三",
+  "customer_phone": "13800138000",
+  "customer_address": "上海市...",
+  "items": [
+    { "product_name": "黑洞", "quantity": 10, "unit_price": 50 }
+  ],
+  "note": ""
+}
+```
+
+---
+
+#### 更新订单
+```
+PUT /api/orders/:id
+```
+
+**可更新字段:**
+```json
+{
+  "order_no": "ORD123456",
+  "customer_id": 1,
+  "total_amount": 500,
+  "status": "completed",
+  "shipping_name": "张三",
+  "shipping_phone": "13800138000",
+  "shipping_address": "上海市...",
+  "note": "",
+  "order_date": "2024-01-15",
+  "paid_amount": 500,
+  "payment_status": "paid",
+  "shipping_status": "shipped"
+}
+```
+
+---
+
+#### 订单发货
+```
+POST /api/orders/:id/ship
+```
+
+**请求体:**
+```json
+{
+  "items": [
+    { "item_id": 1, "ship_quantity": 5 }
+  ]
+}
+```
+
+---
+
+#### 导出PDF
+```
+GET /api/orders/:id/pdf
+```
+
+---
+
+### 订单明细 API
+
+#### 更新订单明细
+```
+PUT /api/order-items/:id
+```
+
+**可更新字段:**
+```json
+{
+  "product_name": "黑洞",
+  "quantity": 10,
+  "unit_price": 50,
+  "unit": "包",
+  "shipped_quantity": 10,
+  "shipping_status": "shipped"
+}
+```
+
+---
+
+#### 删除订单明细
+```
+DELETE /api/order-items/:id
+```
+
+---
+
+#### 新增订单明细
+```
+POST /api/order-items
+```
+
+**请求体:**
+```json
+{
+  "order_id": 1,
+  "product_name": "黑洞",
+  "quantity": 10,
+  "unit_price": 50,
+  "unit": "包"
+}
+```
+
+---
+
+### 客户 API
+
+#### 获取客户列表
+```
+GET /api/customers
+```
+
+**查询参数:**
+
+| 参数 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| all | string | 返回所有客户(含无订单) | ?all=1 |
+| search | string | 搜索姓名/电话/地址 | ?search=张三 |
+| sortBy | string | 排序字段 | ?sortBy=name / order_count / total_receivable |
+| sortOrder | string | 排序方向 | ?sortOrder=asc / desc |
+| page | number | 页码 | ?page=1 |
+| pageSize | number | 每页数量 | ?pageSize=100 |
+
+**返回格式 (all=1时):**
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "张三",
+      "phone": "13800138000",
+      "address": "上海市...",
+      "order_count": 10,
+      "total_receivable": 5000,
+      "total_paid": 5000,
+      "outstanding": 0
+    }
+  ],
+  "total": 550,
+  "page": 1,
+  "pageSize": 100,
+  "totalPages": 6
+}
+```
+
+---
+
+#### 创建客户
+```
+POST /api/customers
+```
+
+**请求体:**
+```json
+{
+  "name": "张三",
+  "phone": "13800138000",
+  "address": "上海市...",
+  "note": ""
+}
+```
+
+---
+
+#### 更新客户
+```
+PUT /api/customers/:id
+```
+
+**请求体:**
+```json
+{
+  "name": "张三",
+  "phone": "13800138000",
+  "address": "上海市...",
+  "note": ""
+}
+```
+
+---
+
+### 商品 API
+
+#### 获取商品列表
+```
+GET /api/products
+```
+
+返回商品列表，包含别名信息。
+
+---
+
+#### 创建商品
+```
+POST /api/products
+```
+
+---
+
+#### 更新商品
+```
+PUT /api/products/:id
+```
+
+---
+
+#### 删除商品
+```
+DELETE /api/products/:id
+```
+
+---
+
+### 库存 API
+
+#### 获取库存
+```
+GET /api/inventory
+```
+
+---
+
+#### 批量更新库存
+```
+POST /api/stock/batch
+```
+
+**请求体:**
+```json
+{
+  "stocks": [
+    { "product_id": 1, "stock": 100 }
+  ]
+}
+```
+
+---
+
+### 统计 API
+
+#### 销售统计
+```
+GET /api/stats
+```
+
+支持查询参数: from, to, groupBy (month/year)
+
+---
 
 ## 品牌色彩
 
