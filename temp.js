@@ -133,23 +133,62 @@ function findProduct(name) {
 
 // ============ API 接口 ============
 
-// 获取所有订单
+// 获取所有订单（支持分页和筛选）
 app.get('/api/orders', (req, res) => {
-    const { from, to, product, customer } = req.query;
+    const { from, to, product, customer, shipping_status, payment_status, has_items, page = 1, pageSize = 50 } = req.query;
 
     let whereClause = '';
     const params = [];
 
+    // 日期筛选（使用 order_date）
     if (from && to) {
-        whereClause += ' WHERE date(o.created_at) BETWEEN ? AND ?';
+        whereClause += whereClause ? ' AND ' : ' WHERE ';
+        whereClause += " date(o.order_date) BETWEEN ? AND ?";
         params.push(from, to);
     } else if (from) {
-        whereClause += ' WHERE date(o.created_at) >= ?';
+        whereClause += whereClause ? ' AND ' : ' WHERE ';
+        whereClause += " date(o.order_date) >= ?";
         params.push(from);
     } else if (to) {
-        whereClause += ' WHERE date(o.created_at) <= ?';
+        whereClause += whereClause ? ' AND ' : ' WHERE ';
+        whereClause += " date(o.order_date) <= ?";
         params.push(to);
     }
+
+    // 发货状态筛选
+    if (shipping_status) {
+        whereClause += whereClause ? ' AND ' : ' WHERE ';
+        whereClause += ' o.shipping_status = ?';
+        params.push(shipping_status);
+    }
+
+    // 付款状态筛选
+    if (payment_status) {
+        whereClause += whereClause ? ' AND ' : ' WHERE ';
+        whereClause += ' o.payment_status = ?';
+        params.push(payment_status);
+    }
+
+    // 是否有明细筛选
+    if (has_items !== undefined) {
+        if (has_items === '0') {
+            whereClause += whereClause ? ' AND ' : ' WHERE ';
+            whereClause += ' o.id NOT IN (SELECT DISTINCT order_id FROM order_items)';
+        } else if (has_items === '1') {
+            whereClause += whereClause ? ' AND ' : ' WHERE ';
+            whereClause += ' o.id IN (SELECT DISTINCT order_id FROM order_items)';
+        }
+    }
+
+    // 先获取总数
+    const countSql = `SELECT COUNT(*) as total FROM orders o LEFT JOIN customers c ON o.customer_id = c.id ${whereClause}`;
+    const totalResult = db.prepare(countSql).get(...params);
+    const total = totalResult.total;
+
+    // 分页参数
+    const currentPage = parseInt(page);
+    const size = parseInt(pageSize);
+    const offset = (currentPage - 1) * size;
 
     let orders = db.prepare(`
         SELECT o.*, c.name as customer_name, c.phone as customer_phone,
@@ -160,8 +199,9 @@ app.get('/api/orders', (req, res) => {
         FROM orders o
         LEFT JOIN customers c ON o.customer_id = c.id
         ${whereClause}
-        ORDER BY o.created_at DESC
-    `).all(...params);
+        ORDER BY o.order_date DESC
+        LIMIT ? OFFSET ?
+    `).all(...params, size, offset);
 
     // 如果有客户筛选
     if (customer) {
@@ -181,15 +221,18 @@ app.get('/api/orders', (req, res) => {
 
     // 计算整体发货状态并返回
     const ordersWithItems = orders.map(order => {
-        // 计算整体发货状态
-        let shipping_status = 'pending';
+        // 优先使用数据库中存储的发货状态，只在有明细且数量不匹配时才重新计算
+        let shipping_status = order.shipping_status || 'pending';
         const totalItems = order.total_items || 0;
         const shippedItems = order.shipped_items || 0;
 
-        if (shippedItems > 0 && shippedItems < totalItems) {
-            shipping_status = 'partial';
-        } else if (shippedItems >= totalItems && totalItems > 0) {
-            shipping_status = 'shipped';
+        // 如果有明细且发货数量不匹配，才重新计算
+        if (totalItems > 0) {
+            if (shippedItems > 0 && shippedItems < totalItems) {
+                shipping_status = 'partial';
+            } else if (shippedItems >= totalItems) {
+                shipping_status = 'shipped';
+            }
         }
 
         const items = db.prepare(`
@@ -201,7 +244,13 @@ app.get('/api/orders', (req, res) => {
         return { ...order, items, shipping_status, total_items: totalItems, shipped_items: shippedItems };
     });
 
-    res.json(ordersWithItems);
+    res.json({
+        data: ordersWithItems,
+        total: total,
+        page: currentPage,
+        pageSize: size,
+        totalPages: Math.ceil(total / size)
+    });
 });
 
 // 获取订单详情
@@ -225,6 +274,47 @@ app.get('/api/orders/:id', (req, res) => {
     `).all(order.id);
 
     res.json({ ...order, items });
+});
+
+// 更新订单
+app.put('/api/orders/:id', (req, res) => {
+    const { id } = req.params;
+    const {
+        order_no, customer_id, total_amount, status,
+        shipping_name, shipping_phone, shipping_address,
+        note, order_date, paid_amount, payment_status, shipping_status
+    } = req.body;
+
+    const fields = [];
+    const values = [];
+
+    if (order_no !== undefined) { fields.push('order_no = ?'); values.push(order_no); }
+    if (customer_id !== undefined) { fields.push('customer_id = ?'); values.push(customer_id); }
+    if (total_amount !== undefined) { fields.push('total_amount = ?'); values.push(total_amount); }
+    if (status !== undefined) { fields.push('status = ?'); values.push(status); }
+    if (shipping_name !== undefined) { fields.push('shipping_name = ?'); values.push(shipping_name); }
+    if (shipping_phone !== undefined) { fields.push('shipping_phone = ?'); values.push(shipping_phone); }
+    if (shipping_address !== undefined) { fields.push('shipping_address = ?'); values.push(shipping_address); }
+    if (note !== undefined) { fields.push('note = ?'); values.push(note); }
+    if (order_date !== undefined) { fields.push('order_date = ?'); values.push(order_date); }
+    if (paid_amount !== undefined) { fields.push('paid_amount = ?'); values.push(paid_amount); }
+    if (payment_status !== undefined) { fields.push('payment_status = ?'); values.push(payment_status); }
+    if (shipping_status !== undefined) { fields.push('shipping_status = ?'); values.push(shipping_status); }
+
+    if (fields.length === 0) {
+        return res.status(400).json({ error: '没有要更新的字段' });
+    }
+
+    values.push(id);
+    const sql = `UPDATE orders SET ${fields.join(', ')} WHERE id = ?`;
+
+    try {
+        db.prepare(sql).run(...values);
+        const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+        res.json(order);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // 发货接口
@@ -269,6 +359,82 @@ app.post('/api/orders/:id/ship', (req, res) => {
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// 更新订单明细
+app.put('/api/order-items/:id', (req, res) => {
+    const { id } = req.params;
+    const { product_name, quantity, unit_price, unit, shipped_quantity, shipping_status } = req.body;
+
+    const fields = [];
+    const values = [];
+
+    if (product_name !== undefined) { fields.push('product_name = ?'); values.push(product_name); }
+    if (quantity !== undefined) { fields.push('quantity = ?'); values.push(parseFloat(quantity)); }
+    if (unit_price !== undefined) { fields.push('unit_price = ?'); values.push(parseFloat(unit_price)); }
+    if (unit !== undefined) { fields.push('unit = ?'); values.push(unit); }
+    if (shipped_quantity !== undefined) { fields.push('shipped_quantity = ?'); values.push(parseFloat(shipped_quantity)); }
+    if (shipping_status !== undefined) { fields.push('shipping_status = ?'); values.push(shipping_status); }
+
+    if (fields.length === 0) {
+        return res.status(400).json({ error: '没有要更新的字段' });
+    }
+
+    // 计算小计
+    const item = db.prepare('SELECT quantity, unit_price FROM order_items WHERE id = ?').get(id);
+    if (item) {
+        const qty = quantity !== undefined ? parseFloat(quantity) : item.quantity;
+        const price = unit_price !== undefined ? parseFloat(unit_price) : item.unit_price;
+        fields.push('subtotal = ?');
+        values.push(qty * price);
+    }
+
+    values.push(id);
+    const sql = `UPDATE order_items SET ${fields.join(', ')} WHERE id = ?`;
+
+    try {
+        db.prepare(sql).run(...values);
+        const updatedItem = db.prepare('SELECT * FROM order_items WHERE id = ?').get(id);
+        res.json(updatedItem);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 删除订单明细
+app.delete('/api/order-items/:id', (req, res) => {
+    const { id } = req.params;
+
+    try {
+        db.prepare('DELETE FROM order_items WHERE id = ?').run(id);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 新增订单明细
+app.post('/api/order-items', (req, res) => {
+    const { order_id, product_id, product_name, quantity, unit_price, unit } = req.body;
+
+    if (!order_id || !product_name) {
+        return res.status(400).json({ error: '订单ID和商品名称必填' });
+    }
+
+    const qty = parseFloat(quantity) || 1;
+    const price = parseFloat(unit_price) || 0;
+
+    try {
+        db.prepare(`
+            INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, subtotal, unit, shipping_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(order_id, product_id || null, product_name, qty, price, qty * price, unit || '包', 'pending');
+
+        const newItem = db.prepare('SELECT * FROM order_items WHERE id = ?').get(db.prepare('SELECT last_insert_rowid()').get()['last_insert_rowid()']);
+        res.json(newItem);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -408,6 +574,35 @@ app.get('/api/customers', (req, res) => {
     }
     const customers = db.prepare(sql).all();
     res.json(customers);
+});
+
+// 更新客户
+app.put('/api/customers/:id', (req, res) => {
+    const { id } = req.params;
+    const { name, phone, address, note } = req.body;
+
+    const fields = [];
+    const values = [];
+
+    if (name !== undefined) { fields.push('name = ?'); values.push(name); }
+    if (phone !== undefined) { fields.push('phone = ?'); values.push(phone); }
+    if (address !== undefined) { fields.push('address = ?'); values.push(address); }
+    if (note !== undefined) { fields.push('note = ?'); values.push(note); }
+
+    if (fields.length === 0) {
+        return res.status(400).json({ error: '没有要更新的字段' });
+    }
+
+    values.push(id);
+    const sql = `UPDATE customers SET ${fields.join(', ')} WHERE id = ?`;
+
+    try {
+        db.prepare(sql).run(...values);
+        const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(id);
+        res.json(customer);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // 获取产品列表

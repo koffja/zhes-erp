@@ -44,9 +44,13 @@ export const api = {
   },
 
   // Orders
-  async getOrders(params = {}) {
-    const query = new URLSearchParams(params).toString()
-    const res = await fetch(`${API_BASE}/orders${query ? '?' + query : ''}`)
+  async getOrders(page = 1, pageSize = 50, filters = {}) {
+    const params = new URLSearchParams({
+      page: page,
+      pageSize: pageSize,
+      ...filters
+    })
+    const res = await fetch(`${API_BASE}/orders?${params}`)
     return res.json()
   },
 
@@ -73,6 +77,32 @@ export const api = {
     return res.json()
   },
 
+  // Order Items CRUD
+  async updateOrderItem(id, data) {
+    const res = await fetch(`${API_BASE}/order-items/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    return res.json()
+  },
+
+  async deleteOrderItem(id) {
+    const res = await fetch(`${API_BASE}/order-items/${id}`, {
+      method: 'DELETE'
+    })
+    return res.json()
+  },
+
+  async createOrderItem(data) {
+    const res = await fetch(`${API_BASE}/order-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    return res.json()
+  },
+
   // Customers
   async getCustomers(all = false) {
     const res = await fetch(`${API_BASE}/customers${all ? '?all=1' : ''}`)
@@ -82,6 +112,15 @@ export const api = {
   async createCustomer(data) {
     const res = await fetch(`${API_BASE}/customers`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    return res.json()
+  },
+
+  async updateCustomer(id, data) {
+    const res = await fetch(`${API_BASE}/customers/${id}`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     })
@@ -104,13 +143,30 @@ export const api = {
   },
 
   // Stats
-  async getStats(period = 'all') {
-    const res = await fetch(`${API_BASE}/stats?period=${period}`)
+  async getStats(period = 'all', from = '', to = '') {
+    let url = `${API_BASE}/stats?period=${period}`
+    if (period === 'custom' && from && to) {
+      url += `&from=${from}&to=${to}`
+    }
+    const res = await fetch(url)
     return res.json()
   },
 
-  async getTopProducts(period = 'all') {
-    const res = await fetch(`${API_BASE}/stats/top-products?period=${period}`)
+  async getTopProducts(period = 'all', from = '', to = '') {
+    let url = `${API_BASE}/stats/top-products?period=${period}`
+    if (period === 'custom' && from && to) {
+      url += `&from=${from}&to=${to}`
+    }
+    const res = await fetch(url)
+    return res.json()
+  },
+
+  async getTopCustomers(period = 'all', from = '', to = '') {
+    let url = `${API_BASE}/stats/top-customers?period=${period}`
+    if (period === 'custom' && from && to) {
+      url += `&from=${from}&to=${to}`
+    }
+    const res = await fetch(url)
     return res.json()
   },
 
