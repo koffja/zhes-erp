@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Tech Stack
 
 - **Backend**: Node.js + Express.js (端口 5126)
-- **Database**: SQLite (better-sqlite3)
+- **Database**: SQLite + Drizzle ORM
 - **Frontend**: Vue 3 + Vite (端口 5271)
 - **PDF Generation**: PDFKit
 - **Routing**: Vue Router 4 SPA
@@ -37,11 +37,43 @@ sudo launchctl load /Library/LaunchDaemons/com.coffee.erp.plist
 ## Architecture
 
 - **Main Server**: `temp.js` - Express server running on port 5126
-- **Database**: SQLite at `data/erp.db` (better-sqlite3)
+- **Database**: SQLite at `data/erp.db` + Drizzle ORM
 - **Frontend**: Vue 3 + Vite at `frontend/` (dev: port 5271)
 - **PDF Generation**: Generates order PDFs stored in `data/`
 - **Service Script**: `server.sh` handles daemonization and process management
 - **LaunchDaemon**: `com.coffee.erp.plist` for macOS boot startup
+
+### Backend Structure (Modular)
+
+```
+server/
+├── db/
+│   ├── index.js           # 数据库连接和迁移 (better-sqlite3)
+│   ├── drizzle.js         # Drizzle ORM 连接
+│   └── drizzleHelpers.js  # Drizzle 查询示例
+├── routes/                # API 路由
+│   ├── index.js
+│   ├── orders.js
+│   ├── customers.js       # 已迁移到 Drizzle
+│   ├── products.js
+│   ├── stats.js
+│   ├── stock.js
+│   ├── suppliers.js
+│   ├── purchases.js
+│   └── orderItems.js
+└── utils/
+    ├── helpers.js
+    └── pdf.js
+
+schemas/
+└── index.js              # 手动维护的 Schema 文档
+
+drizzle/
+└── *.sql                 # Drizzle 生成的迁移文件
+
+schemas/drizzle/
+└── schema.js             # Drizzle 表结构定义
+```
 
 ### Frontend Structure (Vue 3)
 
@@ -178,9 +210,82 @@ tbody tr:hover { background: var(--zhe-ash-rose-hover); }
 
 ### 数据库
 
-- 使用 SQLite (better-sqlite3)
+- 使用 SQLite + Drizzle ORM
 - 字段: id, name, category, specs, price, cost, stock, note, created_at
 - 关联表: product_aliases, orders, order_items, customers, suppliers, purchases
+
+## Drizzle ORM 使用规范 (必须遵循)
+
+### 数据库操作优先级
+
+**必须优先使用 Drizzle ORM**，只有在以下情况可使用原生 SQL：
+1. Drizzle 不支持的复杂查询
+2. 性能关键的聚合查询
+3. 现有代码尚未迁移的模块
+
+### Drizzle 引入方式
+
+```javascript
+// 方式1：使用 Drizzle 助手函数 (推荐)
+const { getOrders, createOrder } = require('./server/db/drizzleHelpers.js');
+
+// 方式2：直接使用 Drizzle (高级用法)
+const { db, schema } = require('./server/db/drizzle');
+const { eq, like, desc } = require('drizzle-orm');
+```
+
+### 常见查询示例
+
+```javascript
+// 查询列表
+const customers = await db
+  .select()
+  .from(schema.customers)
+  .orderBy(schema.customers.name);
+
+// 条件查询
+const results = await db
+  .select()
+  .from(schema.orders)
+  .where(eq(schema.orders.customerId, 123));
+
+// 模糊搜索
+const products = await db
+  .select()
+  .from(schema.products)
+  .where(like(schema.products.name, '%咖啡%'));
+
+// 插入数据
+const result = await db
+  .insert(schema.customers)
+  .values({ name: '新客户', phone: '13800000000' })
+  .run();
+
+// 更新数据
+await db
+  .update(schema.customers)
+  .set({ name: '新名字' })
+  .where(eq(schema.customers.id, 123))
+  .run();
+
+// 删除数据
+await db
+  .delete(schema.customers)
+  .where(eq(schema.customers.id, 123))
+  .run();
+```
+
+### 表结构定义
+
+所有表结构定义在 `schemas/drizzle/schema.js`，字段使用驼峰命名：
+- 数据库字段: `order_no` → Drizzle: `orderNo`
+- 数据库字段: `customer_id` → Drizzle: `customerId`
+
+### Schema 参考
+
+- `schemas/index.js` - 手动维护的 Schema 文档（人类可读）
+- `schemas/drizzle/schema.js` - Drizzle 表结构定义（机器可读）
+- `drizzle/*.sql` - 生成的迁移文件
 
 ### Excel 处理
 
@@ -195,5 +300,5 @@ tbody tr:hover { background: var(--zhe-ash-rose-hover); }
 - [ ] 表格是否同时设置了背景色和文字颜色（深色模式）？
 - [ ] 是否有调试代码（console.log）？
 - [ ] 错误处理是否完整？
-- [ ] SQL 注入防护？
+- [ ] **数据库操作是否优先使用 Drizzle ORM？**
 - [ ] 代码是否有必要的注释？

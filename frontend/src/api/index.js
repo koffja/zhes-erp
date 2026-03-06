@@ -3,8 +3,22 @@ const API_BASE = '/api'
 
 export const api = {
   // Products
-  async getProducts() {
-    const res = await fetch(`${API_BASE}/products`)
+  async getProducts(search = '', category = '', tag = '') {
+    const params = new URLSearchParams()
+    if (search) params.append('search', search)
+    if (category && category !== 'all') params.append('category', category)
+    if (tag && tag !== 'all') params.append('tag', tag)
+    const res = await fetch(`${API_BASE}/products?${params}`)
+    return res.json()
+  },
+
+  async getProductCategories() {
+    const res = await fetch(`${API_BASE}/products/categories`)
+    return res.json()
+  },
+
+  async getProductTags() {
+    const res = await fetch(`${API_BASE}/products/tags`)
     return res.json()
   },
 
@@ -21,6 +35,11 @@ export const api = {
 
   async getProduct(id) {
     const res = await fetch(`${API_BASE}/products/${id}`)
+    return res.json()
+  },
+
+  async getProductOrders(id) {
+    const res = await fetch(`${API_BASE}/products/${id}/orders`)
     return res.json()
   },
 
@@ -51,6 +70,11 @@ export const api = {
       ...filters
     })
     const res = await fetch(`${API_BASE}/orders?${params}`)
+    return res.json()
+  },
+
+  async getOrderDateRange() {
+    const res = await fetch(`${API_BASE}/orders/date-range`)
     return res.json()
   },
 
@@ -104,8 +128,9 @@ export const api = {
   },
 
   // Customers
-  async getCustomers(all = false) {
-    const res = await fetch(`${API_BASE}/customers${all ? '?all=1' : ''}`)
+  async getCustomers(all = false, filters = {}) {
+    const params = new URLSearchParams({ all: '1', ...filters }).toString()
+    const res = await fetch(`${API_BASE}/customers?${params}`)
     return res.json()
   },
 
@@ -144,27 +169,109 @@ export const api = {
 
   // Stats
   async getStats(period = 'all', from = '', to = '') {
-    let url = `${API_BASE}/stats?period=${period}`
+    // Convert period to from/to dates
+    const today = new Date()
+    let startDate = ''
+    let endDate = today.toISOString().split('T')[0]
+
     if (period === 'custom' && from && to) {
-      url += `&from=${from}&to=${to}`
+      startDate = from
+      endDate = to
+    } else if (period === 'today') {
+      startDate = endDate
+    } else if (period === '7days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 7)
+      startDate = d.toISOString().split('T')[0]
+    } else if (period === '15days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 15)
+      startDate = d.toISOString().split('T')[0]
+    } else if (period === '30days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 30)
+      startDate = d.toISOString().split('T')[0]
+    } else if (period === 'month') {
+      const d = new Date(today.getFullYear(), today.getMonth(), 1)
+      startDate = d.toISOString().split('T')[0]
+    }
+    // 'all' period means no date filter
+
+    let url = `${API_BASE}/stats`
+    if (startDate && endDate) {
+      url += `?from=${startDate}&to=${endDate}`
     }
     const res = await fetch(url)
     return res.json()
   },
 
   async getTopProducts(period = 'all', from = '', to = '') {
-    let url = `${API_BASE}/stats/top-products?period=${period}`
+    // Convert period to from/to dates
+    const today = new Date()
+    let startDate = ''
+    let endDate = today.toISOString().split('T')[0]
+
     if (period === 'custom' && from && to) {
-      url += `&from=${from}&to=${to}`
+      startDate = from
+      endDate = to
+    } else if (period === 'today') {
+      startDate = endDate
+    } else if (period === '7days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 7)
+      startDate = d.toISOString().split('T')[0]
+    } else if (period === '15days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 15)
+      startDate = d.toISOString().split('T')[0]
+    } else if (period === '30days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 30)
+      startDate = d.toISOString().split('T')[0]
+    } else if (period === 'month') {
+      const d = new Date(today.getFullYear(), today.getMonth(), 1)
+      startDate = d.toISOString().split('T')[0]
+    }
+
+    let url = `${API_BASE}/stats/top-products`
+    if (startDate && endDate) {
+      url += `?from=${startDate}&to=${endDate}`
     }
     const res = await fetch(url)
     return res.json()
   },
 
   async getTopCustomers(period = 'all', from = '', to = '') {
-    let url = `${API_BASE}/stats/top-customers?period=${period}`
+    // Convert period to from/to dates
+    const today = new Date()
+    let startDate = ''
+    let endDate = today.toISOString().split('T')[0]
+
     if (period === 'custom' && from && to) {
-      url += `&from=${from}&to=${to}`
+      startDate = from
+      endDate = to
+    } else if (period === 'today') {
+      startDate = endDate
+    } else if (period === '7days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 7)
+      startDate = d.toISOString().split('T')[0]
+    } else if (period === '15days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 15)
+      startDate = d.toISOString().split('T')[0]
+    } else if (period === '30days') {
+      const d = new Date()
+      d.setDate(d.getDate() - 30)
+      startDate = d.toISOString().split('T')[0]
+    } else if (period === 'month') {
+      const d = new Date(today.getFullYear(), today.getMonth(), 1)
+      startDate = d.toISOString().split('T')[0]
+    }
+
+    let url = `${API_BASE}/stats/top-customers`
+    if (startDate && endDate) {
+      url += `?from=${startDate}&to=${endDate}`
     }
     const res = await fetch(url)
     return res.json()

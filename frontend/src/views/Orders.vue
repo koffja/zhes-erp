@@ -19,6 +19,7 @@ const totalPages = ref(0)
 
 // 筛选相关
 const showFilters = ref(false)
+const earliestDate = ref('')
 const filters = ref({
   from: '',
   to: '',
@@ -28,6 +29,59 @@ const filters = ref({
   payment_status: '',
   has_items: ''
 })
+
+// 初始化日期范围
+const initDateRange = async () => {
+  const range = await api.getOrderDateRange()
+  // 默认结束日期为今天，开始日期为最早订单日期
+  filters.value.to = range.latest || new Date().toISOString().split('T')[0]
+  filters.value.from = range.earliest || ''
+}
+
+// 快速日期筛选
+const quickDateFilters = [
+  { label: '今天', days: 0 },
+  { label: '最近7天', days: 7 },
+  { label: '最近15天', days: 15 },
+  { label: '最近30天', days: 30 },
+  { label: '本月', days: 'month' },
+  { label: '全部', days: 'all' }
+]
+
+const applyQuickDate = (filter) => {
+  const today = new Date()
+  filters.value.to = today.toISOString().split('T')[0]
+
+  if (filter.days === 'all') {
+    filters.value.from = ''
+  } else if (filter.days === 'month') {
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+    filters.value.from = firstDay.toISOString().split('T')[0]
+  } else if (filter.days >= 0) {
+    const d = new Date()
+    d.setDate(d.getDate() - filter.days)
+    filters.value.from = d.toISOString().split('T')[0]
+  }
+  applyFilters()
+}
+
+// 判断快速筛选是否激活
+const isQuickFilterActive = (filter) => {
+  const todayDate = new Date()
+  const today = todayDate.toISOString().split('T')[0]
+  if (filter.days === 'all') return !filters.value.from
+  if (filter.days === 'month') {
+    const firstDay = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1).toISOString().split('T')[0]
+    return filters.value.from === firstDay && filters.value.to === today
+  }
+  if (filter.days >= 0) {
+    const d = new Date()
+    d.setDate(d.getDate() - filter.days)
+    const expectedFrom = d.toISOString().split('T')[0]
+    return filters.value.from === expectedFrom && filters.value.to === today
+  }
+  return false
+}
 
 // Inline 编辑相关
 const editingId = ref(null)
@@ -315,7 +369,10 @@ const submitShip = async () => {
   }
 }
 
-onMounted(loadOrders)
+onMounted(async () => {
+  await initDateRange()
+  loadOrders()
+})
 </script>
 
 <template>
@@ -327,6 +384,20 @@ onMounted(loadOrders)
       <button class="secondary" @click="showFilters = !showFilters">
         {{ showFilters ? '收起筛选' : '显示筛选' }}
       </button>
+
+      <!-- 快速日期筛选 -->
+      <div class="quick-filters">
+        <button
+          v-for="qf in quickDateFilters"
+          :key="qf.label"
+          class="quick-btn"
+          :class="{ active: isQuickFilterActive(qf) }"
+          @click="applyQuickDate(qf)"
+        >
+          {{ qf.label }}
+        </button>
+      </div>
+
       <span class="filter-summary" v-if="!showFilters">
         <span v-if="filters.from || filters.to">日期: {{ filters.from }} ~ {{ filters.to }}</span>
         <span v-if="filters.shipping_status" style="margin-left: 10px;">发货: {{ { pending: '未发', partial: '部分发', shipped: '已发' }[filters.shipping_status] }}</span>
@@ -420,11 +491,11 @@ onMounted(loadOrders)
               </template>
               <template v-else>{{ order.order_no }}</template>
             </td>
-            <td class="editable" @click="startEdit(order, 'shipping_name')">
-              <template v-if="editingId === order.id && editField === 'shipping_name'">
+            <td class="editable" @click="startEdit(order, 'customer_name')">
+              <template v-if="editingId === order.id && editField === 'customer_name'">
                 <input v-model="editValue" @blur="saveEdit(order)" @keyup.enter="saveEdit(order)" @keyup.escape="cancelEdit" autofocus class="edit-input" />
               </template>
-              <template v-else>{{ order.shipping_name || '-' }}</template>
+              <template v-else>{{ order.customer_name || order.shipping_name || '-' }}</template>
             </td>
             <td class="editable highlight" @click="startEdit(order, 'total_amount')">
               <template v-if="editingId === order.id && editField === 'total_amount'">
@@ -487,8 +558,28 @@ onMounted(loadOrders)
               <span class="label">记录创建：</span>
               <span>{{ formatDate(selectedOrder.created_at) }}</span>
             </div>
+            <!-- 订购人信息 -->
             <div class="info-row">
-              <span class="label">客户：</span>
+              <span class="label">订购人：</span>
+              <span class="editable" @click="startEdit(selectedOrder, 'customer_name')">
+                <template v-if="editingId === selectedOrder.id && editField === 'customer_name'">
+                  <input v-model="editValue" @blur="saveEdit(selectedOrder)" @keyup.enter="saveEdit(selectedOrder)" @keyup.escape="cancelEdit" autofocus class="edit-input" />
+                </template>
+                <template v-else>{{ selectedOrder.customer_name || '-' }}</template>
+              </span>
+            </div>
+            <div class="info-row">
+              <span class="label">订购电话：</span>
+              <span class="editable" @click="startEdit(selectedOrder, 'customer_phone')">
+                <template v-if="editingId === selectedOrder.id && editField === 'customer_phone'">
+                  <input v-model="editValue" @blur="saveEdit(selectedOrder)" @keyup.enter="saveEdit(selectedOrder)" @keyup.escape="cancelEdit" autofocus class="edit-input" />
+                </template>
+                <template v-else>{{ selectedOrder.customer_phone || '-' }}</template>
+              </span>
+            </div>
+            <!-- 联系人/收货信息 -->
+            <div class="info-row">
+              <span class="label">联系人：</span>
               <span class="editable" @click="startEdit(selectedOrder, 'shipping_name')">
                 <template v-if="editingId === selectedOrder.id && editField === 'shipping_name'">
                   <input v-model="editValue" @blur="saveEdit(selectedOrder)" @keyup.enter="saveEdit(selectedOrder)" @keyup.escape="cancelEdit" autofocus class="edit-input" />
@@ -497,7 +588,7 @@ onMounted(loadOrders)
               </span>
             </div>
             <div class="info-row">
-              <span class="label">电话：</span>
+              <span class="label">联系电话：</span>
               <span class="editable" @click="startEdit(selectedOrder, 'shipping_phone')">
                 <template v-if="editingId === selectedOrder.id && editField === 'shipping_phone'">
                   <input v-model="editValue" @blur="saveEdit(selectedOrder)" @keyup.enter="saveEdit(selectedOrder)" @keyup.escape="cancelEdit" autofocus class="edit-input" />
@@ -506,12 +597,32 @@ onMounted(loadOrders)
               </span>
             </div>
             <div class="info-row">
-              <span class="label">地址：</span>
+              <span class="label">收货地址：</span>
               <span class="editable" @click="startEdit(selectedOrder, 'shipping_address')">
                 <template v-if="editingId === selectedOrder.id && editField === 'shipping_address'">
                   <input v-model="editValue" @blur="saveEdit(selectedOrder)" @keyup.enter="saveEdit(selectedOrder)" @keyup.escape="cancelEdit" autofocus class="edit-input" style="width: 300px;" />
                 </template>
                 <template v-else>{{ selectedOrder.shipping_address || '-' }}</template>
+              </span>
+            </div>
+            <!-- 运费 -->
+            <div class="info-row">
+              <span class="label">运费：</span>
+              <span class="editable" @click="startEdit(selectedOrder, 'shipping_fee')">
+                <template v-if="editingId === selectedOrder.id && editField === 'shipping_fee'">
+                  <input v-model="editValue" @blur="saveEdit(selectedOrder)" @keyup.enter="saveEdit(selectedOrder)" @keyup.escape="cancelEdit" autofocus class="edit-input" type="number" step="0.01" style="width: 80px;" />
+                </template>
+                <template v-else>{{ formatPrice(selectedOrder.shipping_fee || 0) }}</template>
+              </span>
+            </div>
+            <!-- 备注 -->
+            <div class="info-row">
+              <span class="label">备注：</span>
+              <span class="editable" @click="startEdit(selectedOrder, 'note')">
+                <template v-if="editingId === selectedOrder.id && editField === 'note'">
+                  <input v-model="editValue" @blur="saveEdit(selectedOrder)" @keyup.enter="saveEdit(selectedOrder)" @keyup.escape="cancelEdit" autofocus class="edit-input" style="width: 300px;" />
+                </template>
+                <template v-else>{{ selectedOrder.note || '-' }}</template>
               </span>
             </div>
             <div class="info-row">
@@ -532,6 +643,11 @@ onMounted(loadOrders)
                 <template v-else class="highlight">{{ formatPrice(selectedOrder.total_amount) }}</template>
               </span>
             </div>
+            <!-- 应收金额 -->
+            <div class="info-row total">
+              <span class="label">应收金额：</span>
+              <span class="highlight">{{ formatPrice((selectedOrder.total_amount || 0) + (selectedOrder.shipping_fee || 0) - (selectedOrder.paid_amount || 0)) }}</span>
+            </div>
           </div>
 
           <h3>订单项目</h3>
@@ -542,6 +658,7 @@ onMounted(loadOrders)
                 <th>产品</th>
                 <th>规格</th>
                 <th>数量</th>
+                <th>已发/总数</th>
                 <th>单价</th>
                 <th>小计</th>
                 <th>操作</th>
@@ -563,6 +680,7 @@ onMounted(loadOrders)
                   </template>
                   <template v-else>{{ item.quantity }} {{ item.unit || '' }}</template>
                 </td>
+                <td>{{ (item.shipped_quantity || 0) }} / {{ item.quantity }}</td>
                 <td class="editable" @click="startEditItem(item, 'unit_price')">
                   <template v-if="editingItemId === item.id && editItemField === 'unit_price'">
                     <input v-model="editItemValue" @blur="saveEditItem(item)" @keyup.enter="saveEditItem(item)" @keyup.escape="cancelEditItem" autofocus class="edit-input" type="number" step="0.01" style="width: 80px;" />
@@ -640,6 +758,33 @@ onMounted(loadOrders)
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.quick-filters {
+  display: flex;
+  gap: 4px;
+}
+
+.quick-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quick-btn:hover {
+  background: var(--zhe-ash-rose-hover);
+}
+
+.quick-btn.active {
+  background: var(--action-primary);
+  color: var(--text-inverse);
+  border-color: var(--action-primary);
 }
 
 .filter-summary {

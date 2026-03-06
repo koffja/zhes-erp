@@ -146,9 +146,9 @@
         }
         
         /* 内容区域 - 大留白 */
-        .container { 
+        .container {
             padding: 30px 40px;
-            max-width: 1400px;
+            max-width: 100%;
             margin: 0 auto;
         }
         
@@ -239,12 +239,16 @@
             font-size: 14px;
             color: var(--text-primary);
         }
-        th, td { 
+        th, td {
             padding: 14px 12px;
             text-align: left;
             border-bottom: 1px solid var(--border-subtle);
         }
-        th { 
+        /* 表格行交替颜色 */
+        tbody tr:nth-child(odd) { background: var(--zhe-oatmeal-stone, #F5F0EB); }
+        tbody tr:nth-child(even) { background: var(--bg-card, #ffffff); }
+        tbody tr:hover { background: var(--zhe-ash-rose-hover, #D8C9C6); }
+        th {
             background: var(--bg-app);
             font-weight: 600;
             font-size: 12px;
@@ -376,8 +380,10 @@
         
         <div id="products" class="section">
             <div class="card">
-                <h3>🎁 产品销售统计</h3>
-                <table id="products-table"><thead><tr><th>产品</th><th>分类</th><th>规格</th><th>售价</th><th>总销量</th><th>销售额</th></tr></thead><tbody></tbody></table>
+                <h3>📋 产品资料</h3>
+                <div style="width:100%;overflow-x:auto;">
+                <table id="products-table" style="width: 100%;"><thead><tr><th>序号</th><th>产品全称</th><th>简称</th><th>分类</th><th>规格</th><th>烘焙</th><th>香型</th><th>产区</th><th>风味</th><th>享味价</th><th>商户价</th><th>批发价</th><th>超大批价</th><th>库存</th><th>创建日期</th><th>操作</th></tr></thead><tbody></tbody></table>
+                </div>
             </div>
         </div>
         
@@ -556,36 +562,88 @@
             }
             
             if (section === 'products') {
-                // 从库存数据中获取产品信息，包含销量的产品用topProducts补充
-                var stats = await fetch(API + '/stats').then(function(r) { return r.json(); });
-                var topProducts = await fetch(API + '/stats/top-products').then(function(r) { return r.json(); });
-                
-                // 创建销量映射
-                var salesMap = {};
-                topProducts.forEach(function(p) {
-                    salesMap[p.product_name] = { qty: p.total_qty, total: p.total };
+                // 从API获取产品资料
+                var products = await fetch(API + '/products').then(function(r) { return r.json(); });
+
+                var html = '';
+                var idx = 1;
+                products.forEach(function(p) {
+                    var pricing = p.pricing || {};
+                    var fullName = pricing.full_name || p.name || '-';
+                    var roast = pricing.roast || '';
+                    var flavor = pricing.flavor || '';
+                    var region = pricing.region || '';
+                    var tastingNotes = pricing.tasting_notes || '';
+                    var createdDate = p.created_at ? p.created_at.split(' ')[0] : '-';
+
+                    html += '<tr data-id="' + p.id + '">';
+                    html += '<td>' + idx + '</td>';
+                    html += '<td class="editable" data-field="full_name">' + fullName + '</td>';
+                    html += '<td class="editable" data-field="name">' + (p.name || '') + '</td>';
+                    html += '<td class="editable" data-field="category">' + (p.category || '') + '</td>';
+                    html += '<td class="editable" data-field="specs">' + (p.specs || '') + '</td>';
+                    html += '<td class="editable" data-field="roast">' + roast + '</td>';
+                    html += '<td class="editable" data-field="flavor">' + flavor + '</td>';
+                    html += '<td class="editable" data-field="region">' + region + '</td>';
+                    html += '<td class="editable" data-field="tasting_notes">' + tastingNotes + '</td>';
+                    html += '<td class="editable highlight" data-field="price">' + (p.price || '') + '</td>';
+                    html += '<td class="editable" data-field="merchant_price">' + (pricing.merchant_price || '') + '</td>';
+                    html += '<td class="editable" data-field="bulk_price">' + (pricing.bulk_price || '') + '</td>';
+                    html += '<td class="editable" data-field="super_bulk_price">' + (pricing.super_bulk_price || '') + '</td>';
+                    html += '<td class="editable" data-field="stock">' + p.stock + '</td>';
+                    html += '<td>' + createdDate + '</td>';
+                    html += '<td><button onclick="deleteProduct(' + p.id + ')" style="padding:2px 8px;background:#f44336;color:white;border:none;border-radius:3px;cursor:pointer">删除</button></td>';
+                    html += '</tr>';
+                    idx++;
                 });
-                
-                // 合并产品数据
-                var products = stats.stock.map(function(p) {
-                    var sale = salesMap[p.name] || { qty: 0, total: 0 };
-                    return {
-                        name: p.name,
-                        category: p.category,
-                        specs: p.specs,
-                        price: p.price,
-                        total_qty: sale.qty,
-                        total: sale.total
+                document.querySelector('#products-table tbody').innerHTML = html || '<tr><td colspan="16" style="text-align:center;color:var(--text-muted)">暂无产品数据</td></tr>';
+
+                // 添加可编辑单元格的点击事件
+                document.querySelectorAll('#products-table td.editable').forEach(function(cell) {
+                    cell.style.cursor = 'pointer';
+                    cell.style.padding = '4px 8px';
+                    cell.title = '点击编辑';
+                    cell.onclick = function() {
+                        if (this.querySelector('input')) return;
+                        var field = this.dataset.field;
+                        var currentValue = this.textContent.trim();
+                        var input = document.createElement('input');
+                        input.type = 'text';
+                        input.value = currentValue;
+                        input.style.cssText = 'width:100%;padding:2px;font-size:inherit;border:2px solid #4CAF50;border-radius:3px;outline:none;';
+                        this.textContent = '';
+                        this.appendChild(input);
+                        input.focus();
+                        input.select();
+
+                        var saveField = function() {
+                            var newValue = input.value.trim();
+                            var row = cell.closest('tr');
+                            var productId = parseInt(row.dataset.id);
+                            var data = { id: productId };
+                            data[field] = field.includes('price') || field === 'stock' ? (parseFloat(newValue) || 0) : newValue;
+
+                            fetch(API + '/products/' + productId, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(data)
+                            }).then(function(r) { return r.json(); }).then(function(res) {
+                                cell.textContent = newValue;
+                                cell.style.backgroundColor = '#e8f5e9';
+                                setTimeout(function() { cell.style.backgroundColor = ''; }, 500);
+                            }).catch(function(err) {
+                                cell.textContent = currentValue;
+                                alert('保存失败: ' + err);
+                            });
+                        };
+
+                        input.onblur = saveField;
+                        input.onkeydown = function(e) {
+                            if (e.key === 'Enter') { input.blur(); }
+                            if (e.key === 'Escape') { cell.textContent = currentValue; }
+                        };
                     };
                 });
-                
-                var html = '';
-                products.forEach(function(p) {
-                    if (p.total_qty > 0 || p.price > 0) {
-                        html += '<tr><td>' + p.name + '</td><td>' + (p.category || '-') + '</td><td>' + (p.specs || '-') + '</td><td>¥' + p.price + '</td><td>' + p.total_qty + '</td><td class="highlight">¥' + p.total + '</td></tr>';
-                    }
-                });
-                document.querySelector('#products-table tbody').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">暂无销售数据</td></tr>';
             }
             
             if (section === 'customers') {
@@ -659,7 +717,13 @@
             alert('库存已保存！');
             loadData('stock');
         }
-        
+
+        async function deleteProduct(id) {
+            if (!confirm('确定要删除这个产品吗？')) return;
+            await fetch(API + '/products/' + id, { method: 'DELETE' });
+            loadData('products');
+        }
+
         // 初始加载
         setPeriod('all');
     </script>

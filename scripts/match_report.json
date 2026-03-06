@@ -1,0 +1,436 @@
+{
+  "results": [
+    {
+      "excel_name": "柠檬花",
+      "short_name": "柠檬花",
+      "specs": "200克",
+      "xwei_price": 66,
+      "matched": true,
+      "match": {
+        "id": 114,
+        "type": "exact_name",
+        "name": "柠檬花",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "蜜香摩卡",
+      "short_name": "蜜香摩卡",
+      "specs": "200克",
+      "xwei_price": 66,
+      "matched": true,
+      "match": {
+        "id": 115,
+        "type": "exact_name",
+        "name": "蜜香摩卡",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "黑美人",
+      "short_name": "黑美人",
+      "specs": "200克",
+      "xwei_price": 66,
+      "matched": true,
+      "match": {
+        "id": 116,
+        "type": "exact_name",
+        "name": "黑美人",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "蝴洛儿",
+      "short_name": "蝴洛儿",
+      "specs": "200克",
+      "xwei_price": 98,
+      "matched": true,
+      "match": {
+        "id": 117,
+        "type": "exact_name",
+        "name": "蝴洛儿",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "花魁XS",
+      "short_name": "花魁XS",
+      "specs": "200克",
+      "xwei_price": 118,
+      "matched": true,
+      "match": {
+        "id": 144,
+        "type": "exact_name",
+        "name": "花魁XS",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "乌拉嘎提波哈洛",
+      "short_name": "乌拉嘎提波哈洛",
+      "specs": "200克",
+      "xwei_price": 178,
+      "matched": true,
+      "match": {
+        "id": 118,
+        "type": "exact_name",
+        "name": "乌拉嘎提波哈洛",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "谷吉低因",
+      "short_name": "谷吉低因",
+      "specs": "200克",
+      "xwei_price": 66,
+      "matched": true,
+      "match": {
+        "id": 119,
+        "type": "exact_name",
+        "name": "谷吉低因",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "五号花园",
+      "short_name": "五号花园",
+      "specs": "200克",
+      "xwei_price": 219,
+      "matched": true,
+      "match": {
+        "id": 120,
+        "type": "exact_name",
+        "name": "五号花园",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "肯尼亚莓宴",
+      "short_name": "肯尼亚莓宴",
+      "specs": "200克",
+      "xwei_price": 110,
+      "matched": true,
+      "match": {
+        "id": 145,
+        "type": "exact_name",
+        "name": "肯尼亚莓宴",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "蜜可可",
+      "short_name": "蜜可可",
+      "specs": "200克",
+      "xwei_price": 66,
+      "matched": true,
+      "match": {
+        "id": 121,
+        "type": "exact_name",
+        "name": "蜜可可",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "天堂92朗姆酒",
+      "short_name": "天堂92朗姆酒",
+      "specs": "200克",
+      "xwei_price": 208,
+      "matched": true,
+      "match": {
+        "id": 123,
+        "type": "exact_name",
+        "name": "天堂92朗姆酒",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "拉斯拉哈斯H1",
+      "short_name": "拉斯拉哈斯H1",
+      "specs": "200克",
+      "xwei_price": 145,
+      "matched": true,
+      "match": {
+        "id": 96,
+        "type": "contains",
+        "name": "拉斯拉哈斯H1(100克）",
+        "score": 80
+      }
+    },
+    {
+      "excel_name": "黄蜜薇拉萨奇",
+      "short_name": "黄蜜薇拉萨奇",
+      "specs": "200克",
+      "xwei_price": 72,
+      "matched": true,
+      "match": {
+        "id": 125,
+        "type": "exact_name",
+        "name": "黄蜜薇拉萨奇",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "哥斯达黎加贝多芬",
+      "short_name": "哥斯达黎加贝多芬",
+      "specs": "200克",
+      "xwei_price": 168,
+      "matched": true,
+      "match": {
+        "id": 126,
+        "type": "exact_name",
+        "name": "哥斯达黎加贝多芬",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "翡翠绿标\n艾薇罗",
+      "short_name": "翡翠绿标",
+      "specs": "200克",
+      "xwei_price": 750,
+      "matched": true,
+      "match": {
+        "id": 24,
+        "type": "exact_name",
+        "name": "翡翠绿标",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "90+埃莱塔瑰夏",
+      "short_name": "90+埃莱塔瑰夏",
+      "specs": "200克",
+      "xwei_price": 490,
+      "matched": true,
+      "match": {
+        "id": 128,
+        "type": "exact_name",
+        "name": "90+埃莱塔瑰夏",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "分界线庄园希爪",
+      "short_name": "分界线庄园希爪",
+      "specs": "200克",
+      "xwei_price": 358,
+      "matched": true,
+      "match": {
+        "id": 45,
+        "type": "contains",
+        "name": "希爪",
+        "score": 80
+      }
+    },
+    {
+      "excel_name": "天堂92条纹波旁",
+      "short_name": "天堂92条纹波旁",
+      "specs": "200克",
+      "xwei_price": 368,
+      "matched": true,
+      "match": {
+        "id": 97,
+        "type": "contains",
+        "name": "天堂92条纹波旁（100克）",
+        "score": 80
+      }
+    },
+    {
+      "excel_name": "分界线瑰夏",
+      "short_name": "分界线瑰夏",
+      "specs": "200克",
+      "xwei_price": 398,
+      "matched": true,
+      "match": {
+        "id": 131,
+        "type": "exact_name",
+        "name": "分界线瑰夏",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "蓝山康丘特",
+      "short_name": "蓝山康丘特",
+      "specs": "200克",
+      "xwei_price": 480,
+      "matched": true,
+      "match": {
+        "id": 132,
+        "type": "exact_name",
+        "name": "蓝山康丘特",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "DR132",
+      "short_name": "DR132",
+      "specs": "200克",
+      "xwei_price": 98,
+      "matched": true,
+      "match": {
+        "id": 134,
+        "type": "exact_name",
+        "name": "DR132",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "花恬珀",
+      "short_name": "花恬珀",
+      "specs": "200克",
+      "xwei_price": 78,
+      "matched": true,
+      "match": {
+        "id": 135,
+        "type": "exact_name",
+        "name": "花恬珀",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "版纳紫妃",
+      "short_name": "版纳紫妃",
+      "specs": "200克",
+      "xwei_price": 75,
+      "matched": true,
+      "match": {
+        "id": 136,
+        "type": "exact_name",
+        "name": "版纳紫妃",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "日光曼特宁",
+      "short_name": "日光曼特宁",
+      "specs": "200克",
+      "xwei_price": 69,
+      "matched": true,
+      "match": {
+        "id": 137,
+        "type": "exact_name",
+        "name": "日光曼特宁",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "白金曼特宁",
+      "short_name": "白金曼特宁",
+      "specs": "200克",
+      "xwei_price": 89,
+      "matched": true,
+      "match": {
+        "id": 138,
+        "type": "exact_name",
+        "name": "白金曼特宁",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "科布兰瑰夏",
+      "short_name": "科布兰瑰夏",
+      "specs": "200克",
+      "xwei_price": 228,
+      "matched": true,
+      "match": {
+        "id": 146,
+        "type": "exact_name",
+        "name": "科布兰瑰夏",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "黑洞",
+      "short_name": "黑洞",
+      "specs": "500",
+      "xwei_price": 110,
+      "matched": true,
+      "match": {
+        "id": 139,
+        "type": "exact_name",
+        "name": "黑洞",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "流星",
+      "short_name": "流星",
+      "specs": "200克",
+      "xwei_price": 110,
+      "matched": true,
+      "match": {
+        "id": 140,
+        "type": "exact_name",
+        "name": "流星",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "天之语",
+      "short_name": "天之语",
+      "specs": "200克",
+      "xwei_price": 110,
+      "matched": true,
+      "match": {
+        "id": 141,
+        "type": "exact_name",
+        "name": "天之语",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "花宙2.0\n肯尼亚AB 6kg（自备）\n云南3A 4kg（自备）\n耶加G2 5kg (自备)\n布谷2kg  (自备)\n花恬珀  3kg（自备）",
+      "short_name": "花宙2.0",
+      "specs": "200克",
+      "xwei_price": 125,
+      "matched": true,
+      "match": {
+        "id": 142,
+        "type": "exact_name",
+        "name": "花宙2.0",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "充电桩",
+      "short_name": "充电桩",
+      "specs": "200克",
+      "xwei_price": 100,
+      "matched": true,
+      "match": {
+        "id": 143,
+        "type": "exact_name",
+        "name": "充电桩",
+        "score": 100
+      }
+    },
+    {
+      "excel_name": "1702二号\n耶加2kg（自备），肯尼亚2.6kg（自备），曼特宁1.4kg（自备），布谷7kg（自备），摩卡G4    7kg",
+      "short_name": "1702二号",
+      "specs": "200克",
+      "xwei_price": null,
+      "matched": true,
+      "match": {
+        "id": 91,
+        "type": "contains",
+        "name": "1702二号拼配",
+        "score": 80
+      }
+    },
+    {
+      "excel_name": "咖啡/商品名称",
+      "short_name": "咖啡/商品名称",
+      "specs": "规格",
+      "xwei_price": "享味价",
+      "matched": false,
+      "match": null
+    }
+  ],
+  "unmatched": [
+    {
+      "name": "咖啡/商品名称",
+      "short_name": "咖啡/商品名称",
+      "specs": "规格",
+      "xwei_price": "享味价"
+    }
+  ]
+}

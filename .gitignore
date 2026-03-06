@@ -4,3 +4,4 @@ data/*.pdf
 data/*.html
 .DS_Store
 *.log
+data/*.pid

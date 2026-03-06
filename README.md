@@ -58,7 +58,7 @@ sudo launchctl load /Library/LaunchDaemons/com.coffee.erp.plist
 
 ## 技术栈
 
-- **后端**: Express.js + better-sqlite3
+- **后端**: Express.js + SQLite + Drizzle ORM
 - **前端**: Vue 3 + Vite
 - **PDF**: pdfkit
 - **字体**: 思源黑体 + 阿里普惠体
@@ -70,9 +70,22 @@ sudo launchctl load /Library/LaunchDaemons/com.coffee.erp.plist
 ├── temp.js              # 后端服务器入口
 ├── server.sh            # 服务管理脚本
 ├── com.coffee.erp.plist # macOS LaunchDaemon 配置
-├── frontend/             # Vue 3 前端
+├── drizzle.config.ts    # Drizzle ORM 配置
+├── server/              # 后端模块化代码
+│   ├── db/              # 数据库层
+│   │   ├── index.js     # better-sqlite3 连接
+│   │   ├── drizzle.js   # Drizzle ORM 连接
+│   │   └── drizzleHelpers.js  # Drizzle 查询示例
+│   ├── routes/          # API 路由
+│   └── utils/           # 工具函数
+├── schemas/             # 数据库 Schema 文档
+│   ├── index.js         # 人类可读的 Schema
+│   └── drizzle/         # Drizzle 表定义
+├── drizzle/             # Drizzle 迁移文件
+├── frontend/            # Vue 3 前端
 │   ├── src/
 │   │   ├── views/       # 页面组件
+│   │   ├── components/ # 公共组件
 │   │   ├── api/         # API 调用
 │   │   └── style.css    # 品牌样式
 │   └── vite.config.js
@@ -84,6 +97,32 @@ sudo launchctl load /Library/LaunchDaemons/com.coffee.erp.plist
 │   └── *.pdf            # 导出的订单 PDF
 └── package.json
 ```
+
+## Drizzle ORM
+
+本项目使用 **Drizzle ORM** 进行数据库操作，提供类型安全的查询。
+
+### 数据库操作
+
+```javascript
+// 引入 Drizzle
+const { db, schema } = require('./server/db/drizzle');
+const { eq, like, desc } = require('drizzle-orm');
+
+// 查询示例
+const customers = await db
+  .select()
+  .from(schema.customers)
+  .orderBy(schema.customers.name);
+
+// 条件查询
+const order = await db
+  .select()
+  .from(schema.orders)
+  .where(eq(schema.orders.id, 123));
+```
+
+详细使用说明见 [CLAUDE.md](CLAUDE.md)。
 
 ## 数据库表
 

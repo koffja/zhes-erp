@@ -12,10 +12,14 @@
   "dependencies": {
     "@fontpkg/alibaba-puhuiti-2-0": "^0.0.0",
     "better-sqlite3": "^12.6.2",
+    "drizzle-orm": "^0.45.1",
     "express": "^5.2.1",
     "html-pdf": "^3.0.1",
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.17.2",
     "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.9"
   }
 }

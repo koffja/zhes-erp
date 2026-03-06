@@ -1,0 +1,77 @@
+/* ========================================
+  Zhe's Coffee - Morandi Porphyry Color System
+  折石咖啡 - 紫岩霞光 品牌色彩變數庫
+  ========================================
+*/
+
+:root {
+  /* 第一層：基礎色板 (Global Color Palette)
+    定義顏色的絕對值，不直接用於佈局，僅供語義化變數引用。
+  */
+  --zhe-dark-porphyry: #3A2E35;   /* 暗斑岩 (神秘、技術權威) */
+  --zhe-ash-rose: #C4B1AE;        /* 灰燼粉 (人文、喚醒的溫度) */
+  --zhe-tuff-white: #EAE5E1;      /* 凝灰白 (空間基底、呼吸感) */
+  
+  --zhe-obsidian-ash: #1A1518;    /* 黑曜灰 (極深紫灰，用於極高對比文本) */
+  --zhe-weathered-gray: #7A7074;  /* 風化岩 (輔助灰，用於次要信息) */
+  
+  --zhe-ash-rose-hover: #D8C9C6;  /* 霞光微亮 (交互懸停) */
+  --zhe-ash-rose-active: #AD9794; /* 沉岩暗影 (交互按下) */
+
+  /* 第二層：語義化變數 - 淺色模式 (Light Mode - 默認)
+    將基礎色板映射到具體的 UI 元素上，方便後期維護與深色模式切換。
+  */
+  --bg-app: var(--zhe-tuff-white);          /* 應用程式全局背景 */
+  --bg-card: #FFFFFF;                       /* 卡片/容器背景 (純白襯托凝灰白) */
+  --bg-elevated: var(--zhe-tuff-white);     /* 懸浮/彈出層背景 */
+
+  --text-primary: var(--zhe-obsidian-ash);  /* 主要標題/正文 (極高對比度) */
+  --text-secondary: var(--zhe-dark-porphyry); /* 次要信息/副標題 */
+  --text-muted: var(--zhe-weathered-gray);  /* 禁用狀態/註釋/座標軸 */
+  --text-inverse: var(--zhe-tuff-white);    /* 反白文字 (用於深色按鈕上) */
+
+  --border-subtle: #D1C9C7;                 /* 柔和的分割線 (基於凝灰白加深) */
+  --border-strong: var(--zhe-dark-porphyry);/* 強調邊框 */
+
+  --action-primary: var(--zhe-dark-porphyry);       /* 主要按鈕/核心導航 */
+  --action-primary-hover: var(--zhe-obsidian-ash); 
+  
+  --action-accent: var(--zhe-ash-rose);             /* 點睛/強調/喚醒動作 (如：提交杯測) */
+  --action-accent-hover: var(--zhe-ash-rose-hover);
+  --action-accent-active: var(--zhe-ash-rose-active);
+}
+
+/* ========================================
+  深色模式反轉邏輯 (Dark Mode)
+  利用 CSS 媒體查詢自動切換，或透過在 body 添加 .dark-theme 類名手動控制。
+  ========================================
+*/
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* 深色模式下的語義化變數重新映射 */
+    
+    /* 背景變得深邃，像沉靜的烘焙實驗室 */
+    --bg-app: var(--zhe-obsidian-ash);        /* 極暗的背景底色 */
+    --bg-card: var(--zhe-dark-porphyry);      /* 卡片背景使用暗斑岩，拉開層次 */
+    --bg-elevated: #281F24;                   /* 介於黑曜灰與暗斑岩之間的懸浮層 */
+
+    /* 文字反轉，保證清晰但不過曝（保護視力） */
+    --text-primary: var(--zhe-tuff-white);    /* 主標題使用凝灰白反白 */
+    --text-secondary: var(--zhe-ash-rose);    /* 次要信息透出淡淡的灰燼粉，極具高級感 */
+    --text-muted: var(--zhe-weathered-gray);  /* 輔助文字保持風化岩 */
+    --text-inverse: var(--zhe-obsidian-ash);  /* 反白文字變黑 */
+
+    /* 邊框與分割線 */
+    --border-subtle: #4D3D46;                 /* 基於暗斑岩提亮的深色分割線 */
+    --border-strong: var(--zhe-ash-rose);     /* 強調邊框 */
+
+    /* 交互組件 */
+    --action-primary: var(--zhe-tuff-white);  /* 核心按鈕在深色下反白，更醒目 */
+    --action-primary-hover: #FFFFFF;
+    
+    /* 灰燼粉作為點睛色，在深色背景下會有微微發光的「霞光」效果 */
+    --action-accent: var(--zhe-ash-rose);             
+    --action-accent-hover: var(--zhe-ash-rose-hover);
+  }
+}
