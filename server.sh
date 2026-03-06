@@ -3,7 +3,7 @@
 # 折石ERP 服务管理脚本
 # 用法: ./server.sh start|stop|restart|status
 
-APP_DIR="/Users/opikr/Projects/zhes-erp"
+APP_DIR="/Users/chengzhe/Projects/zhes-erp"
 PID_FILE="$APP_DIR/data/server.pid"
 LOG_FILE="$APP_DIR/data/server.log"
 
